@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+.DS_Store
+data/
+private/
+*.sqlite*
+*.db
+*.log
+node_modules/
+build/
+dist/

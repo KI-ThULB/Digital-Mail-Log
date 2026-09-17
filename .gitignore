@@ -1,15 +1,31 @@
+# Python
 __pycache__/
 *.py[cod]
 .venv/
+venv/
+
+# Umgebung und Geheimnisse
 .env
 .env.*
 !.env.example
-.DS_Store
-data/
-private/
+
+# Betriebsdaten – gehören niemals ins Repository
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 *.sqlite*
 *.db
+data/
+fotos/
+private/
 *.log
+
+# Bestandteile der Texterkennung, per web/vendor/hole-tesseract.sh geholt
+web/vendor/tesseract/
+
+# Werkzeuge
 node_modules/
 build/
 dist/
+.pytest_cache/
+.DS_Store

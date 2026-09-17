@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Digitales Postbuch</title>
+    <meta name="description" content="Erfassung von Posteingängen und Postausgängen" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#205c54" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Postbuch" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <a class="skip" href="#hauptbereich">Zum Inhalt springen</a>
+
+    <header class="topbar">
+      <div class="topbar__title">
+        <strong>Digitales Postbuch</strong>
+        <span id="kennung" class="muted"></span>
+      </div>
+      <div class="topbar__status">
+        <span id="netz" class="pill" role="status" aria-live="polite">Verbindung wird geprüft</span>
+        <button id="jetzt-uebertragen" class="ghost" type="button" hidden>Jetzt übertragen</button>
+      </div>
+    </header>
+
+    <div id="hinweis" class="banner banner--warn" role="status" aria-live="polite" hidden></div>
+
+    <main id="hauptbereich" tabindex="-1">
+      <!-- ---------------------------------------------------------------- -->
+      <section id="view-liste" class="view">
+        <div class="toolbar">
+          <div class="segmented" role="group" aria-label="Richtung filtern">
+            <button type="button" data-richtung="" class="is-active">Alle</button>
+            <button type="button" data-richtung="incoming">Eingang</button>
+            <button type="button" data-richtung="outgoing">Ausgang</button>
+          </div>
+          <button id="neu" class="primary" type="button">＋ Sendung erfassen</button>
+        </div>
+
+        <div class="filters">
+          <label class="field field--grow">
+            <span>Suchen</span>
+            <input
+              id="suche"
+              type="search"
+              inputmode="search"
+              placeholder="Name, Organisation, Inhalt, PSP-Element, Nummer"
+              autocomplete="off"
+            />
+          </label>
+          <label class="field">
+            <span>Von</span>
+            <input id="datum-von" type="date" />
+          </label>
+          <label class="field">
+            <span>Bis</span>
+            <input id="datum-bis" type="date" />
+          </label>
+          <label class="field">
+            <span>Sendungsart</span>
+            <select id="filter-art"><option value="">Alle Arten</option></select>
+          </label>
+          <label class="field field--check">
+            <input id="filter-storniert" type="checkbox" />
+            <span>Stornierte zeigen</span>
+          </label>
+          <div class="filters__actions">
+            <button id="filter-zuruecksetzen" class="ghost" type="button">Filter zurücksetzen</button>
+            <a id="export" class="ghost" href="#" download>Als CSV exportieren</a>
+          </div>
+        </div>
+
+        <div id="summe" class="summary" hidden></div>
+        <p id="liste-status" class="muted" role="status" aria-live="polite"></p>
+        <ul id="liste" class="entries"></ul>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section id="view-formular" class="view" hidden>
+        <form id="formular" novalidate>
+          <div class="formhead">
+            <button type="button" class="ghost" data-zurueck>← Zurück</button>
+            <h1 id="formular-titel">Sendung erfassen</h1>
+            <span id="formular-nummer" class="muted"></span>
+          </div>
+
+          <fieldset class="card">
+            <legend>Richtung</legend>
+            <div class="segmented segmented--large" role="group" aria-label="Richtung der Sendung">
+              <button type="button" data-richtung-wahl="incoming">Posteingang</button>
+              <button type="button" data-richtung-wahl="outgoing">Postausgang</button>
+            </div>
+            <p id="richtung-warnung" class="hint hint--warn" hidden>
+              Beim Wechsel auf Eingang werden Porto und PSP-Element entfernt. Die bisherigen Werte
+              bleiben in der Änderungshistorie erhalten.
+            </p>
+          </fieldset>
+
+          <fieldset class="card">
+            <legend>Adresse erfassen</legend>
+            <div class="capture">
+              <label class="capture__button">
+                <input id="foto-erkennung" type="file" accept="image/*" capture="environment" />
+                <span>📷 Adresse fotografieren</span>
+              </label>
+              <p id="ocr-status" class="hint" role="status" aria-live="polite">
+                Texterkennung wird geprüft …
+              </p>
+            </div>
+            <details id="ocr-ergebnis" hidden>
+              <summary>Erkannter Text</summary>
+              <pre id="ocr-text" class="ocr-text"></pre>
+              <p id="ocr-herkunft" class="hint"></p>
+            </details>
+          </fieldset>
+
+          <fieldset class="card">
+            <legend id="beteiligte-legende">Beteiligte</legend>
+            <div class="grid">
+              <label class="field">
+                <span id="label-absender">Absender</span>
+                <input id="absender-name" type="text" autocomplete="off" placeholder="Name oder Organisation" />
+              </label>
+              <label class="field">
+                <span>Organisation (Absender)</span>
+                <input id="absender-org" type="text" autocomplete="off" />
+              </label>
+              <label class="field field--wide">
+                <span>Anschrift (Absender)</span>
+                <textarea id="absender-adresse" rows="3"></textarea>
+              </label>
+              <div id="absender-vorschlaege" class="suggestions" aria-live="polite"></div>
+            </div>
+            <div class="grid">
+              <label class="field">
+                <span id="label-empfaenger">Empfänger</span>
+                <input id="empfaenger-name" type="text" autocomplete="off" placeholder="Name oder Organisation" />
+              </label>
+              <label class="field">
+                <span>Organisation (Empfänger)</span>
+                <input id="empfaenger-org" type="text" autocomplete="off" />
+              </label>
+              <label class="field field--wide">
+                <span>Anschrift (Empfänger)</span>
+                <textarea id="empfaenger-adresse" rows="3"></textarea>
+              </label>
+              <div id="empfaenger-vorschlaege" class="suggestions" aria-live="polite"></div>
+            </div>
+          </fieldset>
+
+          <fieldset class="card">
+            <legend>Sendung</legend>
+            <div class="grid">
+              <label class="field">
+                <span>Sendungsart</span>
+                <input id="art" list="arten" type="text" autocomplete="off" />
+                <datalist id="arten"></datalist>
+              </label>
+              <label class="field">
+                <span>Sendungsdatum</span>
+                <input id="datum" type="date" required />
+              </label>
+              <label class="field field--wide">
+                <span>Beschreibung des Inhalts</span>
+                <textarea id="beschreibung" rows="2" placeholder="z. B. Zeitschriftenlieferung, Vertrag, Rechnung"></textarea>
+              </label>
+              <p class="hint field--wide">
+                Bei ungeöffneter Post ist „Inhalt unbekannt“ die richtige Angabe. Aus einem Umschlag
+                lässt sich der Inhalt nicht erschließen.
+              </p>
+            </div>
+          </fieldset>
+
+          <fieldset class="card" id="kosten" hidden>
+            <legend>Kosten (nur Ausgang)</legend>
+            <div class="grid">
+              <label class="field">
+                <span>Porto in EUR</span>
+                <input id="porto" type="text" inputmode="decimal" placeholder="z. B. 1,80" />
+                <small class="hint">Leer bedeutet unbekannt. 0,00 bedeutet ausdrücklich portofrei.</small>
+              </label>
+              <label class="field">
+                <span>PSP-Element</span>
+                <input id="psp" type="text" autocomplete="off" spellcheck="false" />
+                <small class="hint">Wird unverändert übernommen, einschließlich führender Nullen.</small>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="card">
+            <legend>Belegfotos</legend>
+            <label class="capture__button capture__button--small">
+              <input id="foto-beleg" type="file" accept="image/*" capture="environment" multiple />
+              <span>📎 Foto zur Dokumentation hinzufügen</span>
+            </label>
+            <ul id="beleg-liste" class="thumbs"></ul>
+            <p class="hint">
+              Das Foto zur Erkennung wird nach der Übernahme verworfen. Nur ausdrücklich hinzugefügte
+              Belegfotos bleiben am Eintrag.
+            </p>
+          </fieldset>
+
+          <fieldset class="card" id="grund-feld" hidden>
+            <legend>Grund der Änderung</legend>
+            <label class="field field--wide">
+              <span>Wird in der Änderungshistorie festgehalten</span>
+              <input id="grund" type="text" autocomplete="off" />
+            </label>
+          </fieldset>
+
+          <p id="formular-fehler" class="banner banner--error" role="alert" hidden></p>
+
+          <div class="actions actions--sticky">
+            <button type="submit" class="primary" id="speichern">Speichern</button>
+            <button type="button" class="ghost" data-zurueck>Abbrechen</button>
+            <button type="button" class="danger" id="stornieren" hidden>Stornieren</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section id="view-detail" class="view" hidden>
+        <div class="formhead">
+          <button type="button" class="ghost" data-zurueck>← Zurück</button>
+          <h1 id="detail-titel">Sendung</h1>
+        </div>
+        <div id="detail-inhalt"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span id="speicher-info" class="muted"></span>
+      <span id="warteschlange" class="muted"></span>
+    </footer>
+
+    <script type="module" src="js/app.js"></script>
+    <noscript>
+      <p class="banner banner--error">
+        Diese Anwendung benötigt JavaScript. Ohne JavaScript ist keine Erfassung möglich.
+      </p>
+    </noscript>
+  </body>
+</html>

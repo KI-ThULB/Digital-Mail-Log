@@ -1,0 +1,24 @@
+{
+  "name": "Digitales Postbuch",
+  "short_name": "Postbuch",
+  "description": "Erfassung von Posteingängen und Postausgängen in der Poststelle",
+  "lang": "de",
+  "dir": "ltr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f7f6",
+  "theme_color": "#205c54",
+  "categories": ["productivity", "business"],
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Posteingang erfassen", "url": "./?neu=incoming" },
+    { "name": "Postausgang erfassen", "url": "./?neu=outgoing" }
+  ]
+}

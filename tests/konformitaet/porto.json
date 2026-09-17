@@ -1,0 +1,37 @@
+{
+  "beschreibung": "Gemeinsamer Prüfkorpus für Portobeträge. Wird sowohl vom Fachkern (postbuch/domain.py) als auch von der Web-App (web/js/porto.js) geprüft, damit beide Seiten nicht auseinanderlaufen.",
+  "gueltig": [
+    { "eingabe": "", "cent": null, "warum": "leer bedeutet unbekannt" },
+    { "eingabe": "   ", "cent": null, "warum": "nur Leerzeichen ist ebenfalls unbekannt" },
+    { "eingabe": "0", "cent": 0, "warum": "ausdrücklich portofrei, nicht unbekannt" },
+    { "eingabe": "0,00", "cent": 0, "warum": "portofrei in ausgeschriebener Form" },
+    { "eingabe": "0,01", "cent": 1, "warum": "kleinster Betrag" },
+    { "eingabe": "1,05", "cent": 105, "warum": "übliche Schreibweise mit Komma" },
+    { "eingabe": "1.05", "cent": 105, "warum": "Punkt als Dezimaltrennzeichen wird angenommen" },
+    { "eingabe": "2,7", "cent": 270, "warum": "eine Nachkommastelle wird zu Zehntel-Euro" },
+    { "eingabe": "100", "cent": 10000, "warum": "ganze Euro ohne Nachkommastellen" },
+    { "eingabe": " 1,80 ", "cent": 180, "warum": "Leerzeichen werden abgeschnitten" },
+    { "eingabe": "1,80 €", "cent": 180, "warum": "nachgestelltes Währungszeichen ist erlaubt" },
+    { "eingabe": "160,00", "cent": 16000, "warum": "größerer Betrag, etwa eine Paketsendung" }
+  ],
+  "ungueltig": [
+    { "eingabe": "-1", "warum": "negatives Porto gibt es nicht" },
+    { "eingabe": "1,234", "warum": "mehr als zwei Nachkommastellen" },
+    { "eingabe": "1.000,00", "warum": "Tausendertrennzeichen ist mehrdeutig" },
+    { "eingabe": "1,", "warum": "abgebrochene Eingabe" },
+    { "eingabe": ",50", "warum": "fehlender Eurobetrag" },
+    { "eingabe": "NaN", "warum": "kein Zahlwert" },
+    { "eingabe": "inf", "warum": "kein Zahlwert" },
+    { "eingabe": "1e3", "warum": "Exponentialschreibweise ist keine Portoangabe" },
+    { "eingabe": "€2", "warum": "vorangestelltes Währungszeichen ist nicht vorgesehen" },
+    { "eingabe": "2 EUR", "warum": "Währungsname wird nicht gelesen" },
+    { "eingabe": "1234567890,00", "warum": "unplausibel lang" }
+  ],
+  "anzeige": [
+    { "cent": null, "text": "" },
+    { "cent": 0, "text": "0,00" },
+    { "cent": 5, "text": "0,05" },
+    { "cent": 180, "text": "1,80" },
+    { "cent": 16000, "text": "160,00" }
+  ]
+}

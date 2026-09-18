@@ -30,6 +30,30 @@ const STRASSENENDUNGEN = [
   'damm', 'ufer', 'chaussee', 'steig', 'pfad', 'markt', 'hof', 'berg', 'tal', 'graben',
 ];
 
+/** Beschriftungen, die auf einem Etikett die Beteiligten benennen. */
+// Die Umlaute sind nachsichtig geschrieben: die Texterkennung liest „Empfänger“
+// auf einem gedruckten Etikett oft als „Empfanger“ oder „Empfaenger“.
+// Gruppe 1 ist immer der Rest der Zeile hinter der Beschriftung.
+const ANKER = [
+  {
+    seite: 'empfaenger',
+    muster: /^(?:(?:waren)?empf(?:ä|ae|a)nger|lieferanschrift|lieferadresse|zustelladresse|consignee|ship\s*to|deliver(?:y)?\s*(?:address|to))\b[:.]?\s*(.*)$/i,
+  },
+  {
+    seite: 'absender',
+    muster: /^(?:absender|versender|retoure|r(?:ü|ue|u)cksendung|sender|shipper|return\s*(?:to|address)|ship\s*from)\b[:.]?\s*(.*)$/i,
+  },
+];
+
+/** Feldbeschriftungen von Paketetiketten: sie beenden einen Adressblock. */
+const ETIKETTENFELD = /^(referenz\s*\d*|ref\.?\s*\d*|lieferung|gewicht|weight|depot|track(ing)?|service|produkt|packst(ü|ue)ck|sendungs?nr|auftrag|kundennr|datum|st(ü|ue)ck|colli|nachnahme|cod)\b/i;
+
+/** Frachtführer: ihre eigene Anschrift auf dem Etikett ist nicht die Beteiligte. */
+const FRACHTFUEHRER = /\b(dpd\s*(deutschland)?|deutsche\s*post(\s*ag)?|dhl|ups|gls|hermes|fedex|tnt|dachser|schenker|go!?\s*express|trans-o-flex)\b/i;
+
+/** Fließtext: Haftungs- und Hinweissätze, die auf Etiketten gedruckt sind. */
+const FLIESSTEXT = /\b(m(ü|ue)ssen|werden|wurde|k(ö|oe)nnen|innerhalb|gemeldet|haftung|bedingungen|hinweis|bitte\s|has\s+to\s+be|must\s+be|within|reported|according)\b/i;
+
 /** Zeilen, die zur Frankierung oder zum Transport gehören, nicht zur Anschrift. */
 const RAUSCHEN = [
   /^deutsche\s*post\b/i,
@@ -48,7 +72,15 @@ const RAUSCHEN = [
   /^priority$/i,
   /^prioritaire$/i,
   /^luftpost$/i,
+  /^tel\.?\s|^telefon|^fon\b|^mobil\b|^\+\d{2}[\d\s/-]{6,}$/i,
+  /^\d+[,.]\d{1,2}\s*kg$/i,
+  /^\d+\s*\/\s*\d+$/,
+  /delisprint|easylog|zebra|win\b\s*$/i,
+  /^[A-Z]{2}-[A-Z]{3}-\d{3,}$/i,
 ];
+
+/** So viele Zeilen über der Straße werden als Name und Organisation gewertet. */
+const KOPFZEILEN = 4;
 
 const SENDUNGSARTEN = [
   [/einschreiben\s*(mit\s*)?r(ü|ue)ckschein/i, 'Einschreiben Rückschein'],
@@ -125,6 +157,9 @@ export function matchStreetLine(line) {
   if (!withNumber) return null;
   const name = withNumber[1].trim();
   if (/^\d/.test(name) || name.length < 2) return null;
+  // Ein Straßenname enthält mindestens ein richtiges Wort. Ohne diese Prüfung
+  // liest die Erkennung „J U 8 1 k“ aus einem Strichcode als „Straße J U 8“.
+  if (!/(^|\s)[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß.'-]{2,}(\s|$)/.test(name)) return null;
   const words = normalise(name).split(' ');
   const last = words[words.length - 1] || '';
   const looksLikeStreet =
@@ -187,6 +222,128 @@ export function splitReturnLine(lines) {
 }
 
 /**
+ * Beurteilt, ob eine Zeile überhaupt Adressmaterial sein kann.
+ *
+ * Texterkennung auf einem Paketetikett liefert neben der Anschrift reichlich
+ * Unsinn: Strichcodes und Matrixcodes werden als Buchstabenfolgen „gelesen“.
+ * Auf einem echten Etikett standen 83 Zeilen im Ergebnis, brauchbar waren drei.
+ * Was diese Prüfung nicht passiert, wird verworfen und in den Anmerkungen
+ * gezählt – es landet nie in einem Feld.
+ */
+export function istLesbar(zeile) {
+  const text = (zeile || '').trim();
+  if (text.length < 2) return false;
+  // Klar erkennbare Formen gelten immer, auch wenn sie kurz sind.
+  if (matchPostalLine(text) || matchStreetLine(text)) return true;
+
+  const teile = text.split(/\s+/);
+  const wortartig = teile.filter((t) => /^[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß.''-]+$/.test(t));
+  // Ohne ein einziges richtiges Wort ist es kein Name und keine Organisation.
+  if (!wortartig.some((t) => t.length >= 4)) return false;
+  if (wortartig.length / teile.length < 0.5) return false;
+  const einzeln = teile.filter((t) => t.length === 1 && !/\d/.test(t));
+  if (einzeln.length * 3 > teile.length) return false;
+  const buchstaben = (text.match(/[A-Za-zÄÖÜäöüß]/g) || []).length;
+  return buchstaben / text.length >= 0.45;
+}
+
+/** Benennt die Zeile eine Seite („Empfänger:“, „Absender“, „Ship to“)? */
+export function istAnkerzeile(zeile) {
+  return ANKER.some((a) => a.muster.test(zeile));
+}
+
+/** Gehört die Zeile zum Frachtführer, zu einem Etikettenfeld oder zu Fließtext? */
+export function istFremdzeile(zeile) {
+  return (
+    ETIKETTENFELD.test(zeile) ||
+    FRACHTFUEHRER.test(zeile) ||
+    (FLIESSTEXT.test(zeile) && zeile.length > 30)
+  );
+}
+
+/**
+ * Teilt Etikettenzeilen anhand der Beschriftungen „Empfänger“ und „Absender“ auf.
+ *
+ * Paketetiketten benennen die Beteiligten ausdrücklich. Wo diese Anker lesbar
+ * sind, sind sie verlässlicher als jede Annahme über die Anordnung. Ein Block
+ * endet beim nächsten Anker oder bei einer Feldbeschriftung wie „Referenz“.
+ *
+ * @returns {{empfaenger:string[], absender:string[], rest:string[], gefunden:boolean}}
+ */
+export function segmentiereEtikett(zeilen) {
+  const bloecke = { empfaenger: [], absender: [], rest: [] };
+  let aktuell = null;
+  let gefunden = false;
+
+  for (const zeile of zeilen) {
+    const anker = ANKER.map((a) => ({ seite: a.seite, treffer: zeile.match(a.muster) }))
+      .find((a) => a.treffer);
+    if (anker) {
+      gefunden = true;
+      aktuell = anker.seite;
+      // „Empfänger: Max Mustermann“ – der Rest der Zeile gehört schon dazu.
+      const rest = (anker.treffer[1] || '').trim();
+      if (rest && istLesbar(rest)) bloecke[aktuell].push(rest);
+      continue;
+    }
+    if (istFremdzeile(zeile)) {
+      aktuell = null;
+      bloecke.rest.push(zeile);
+      continue;
+    }
+    (aktuell ? bloecke[aktuell] : bloecke.rest).push(zeile);
+  }
+  return { ...bloecke, gefunden };
+}
+
+/**
+ * Zerlegt ein Paketetikett in beide Beteiligte.
+ *
+ * Findet sie die Beschriftungen, folgt sie ihnen. Findet sie keine, fällt sie
+ * auf die Umschlagsregel zurück: großer Block Empfänger, kleine Zeile darüber
+ * Absender.
+ */
+export function parseLabel(text) {
+  const alle = tidy(text);
+  // Ankerzeilen und Feldbeschriftungen tragen selbst keine Anschrift, ordnen aber
+  // die Blöcke – sie müssen die Lesbarkeitsprüfung überstehen.
+  const lesbar = alle.filter(
+    (z) => istAnkerzeile(z) || istFremdzeile(z) || (!isNoise(z) && istLesbar(z)),
+  );
+  const verworfen = alle.length - lesbar.length;
+  const teile = segmentiereEtikett(lesbar);
+
+  if (!teile.gefunden) {
+    const ganz = parseAddress(text);
+    const rueck = ganz.returnLine
+      ? parseAddress(ganz.returnLine.replace(/\s*[·•]\s*/g, '\n').replace(/\s+[-–]\s+/g, '\n'))
+      : leeresErgebnis();
+    return {
+      empfaenger: ganz,
+      absender: rueck,
+      ankerGefunden: false,
+      verworfeneZeilen: verworfen,
+      notes: ganz.notes,
+    };
+  }
+
+  const empfaenger = parseAddress(teile.empfaenger.join('\n'));
+  const absender = parseAddress(teile.absender.join('\n'));
+  const notes = [];
+  if (verworfen) notes.push(`${verworfen} unlesbare Zeilen übergangen.`);
+  notes.push('Beschriftungen „Empfänger“ und „Absender“ wurden als Anker genutzt.');
+  if (!teile.absender.length) notes.push('Keine Absenderangabe gefunden.');
+  return { empfaenger, absender, ankerGefunden: true, verworfeneZeilen: verworfen, notes };
+}
+
+function leeresErgebnis() {
+  return {
+    person: '', organisation: '', street: '', postalCode: '', city: '', country: '',
+    address: '', returnLine: '', shipmentType: '', confidence: 0, notes: [], lines: [],
+  };
+}
+
+/**
  * Hauptfunktion: erkannter Text in Adressfelder.
  *
  * @param {string} text Rohtext aus der Texterkennung oder aus der Zwischenablage.
@@ -197,8 +354,8 @@ export function splitReturnLine(lines) {
 export function parseAddress(text) {
   const notes = [];
   const all = tidy(text);
-  const clean = all.filter((line) => !isNoise(line));
-  if (all.length !== clean.length) notes.push('Zeilen zur Frankierung wurden übergangen.');
+  const clean = all.filter((line) => !isNoise(line) && istLesbar(line));
+  if (all.length !== clean.length) notes.push('Unlesbare Zeilen und Frankierung wurden übergangen.');
 
   const { returnLine, rest } = splitReturnLine(clean);
   if (returnLine) notes.push('Eine Zeile wurde als Absenderangabe des Fensterumschlags gewertet.');
@@ -234,14 +391,27 @@ export function parseAddress(text) {
     }
   }
 
-  const head = rest.slice(0, streetIndex === -1 ? upper : streetIndex);
+  // Über der Straße stehen Name und Organisation. Steht dort mehr, ist der
+  // Überschuss auf einem Etikett fast immer Beiwerk; die Anschrift steht direkt
+  // über der Straße. Deshalb zählen nur die letzten Zeilen des Kopfes.
+  const kopfGanz = rest.slice(0, streetIndex === -1 ? upper : streetIndex);
+  const head = kopfGanz.slice(-KOPFZEILEN);
+  const uebergangen = kopfGanz.length - head.length;
+
+  // Ein Block gilt als verankert, wenn Postleitzahl oder Straße gefunden wurden.
+  // Nur dann ist eine nicht eingeordnete Zeile plausibel ein Organisationsname –
+  // ohne diesen Anker wäre sie bloß Text, der zufällig über etwas anderem stand.
+  const verankert = postalIndex !== -1 || streetIndex !== -1;
   const organisationLines = [];
   const personLines = [];
+  let verworfen = uebergangen;
   for (const line of head) {
     if (looksLikeOrganisation(line)) organisationLines.push(line);
     else if (looksLikePerson(line)) personLines.push(stripSalutation(line).text);
-    else organisationLines.push(line);
+    else if (verankert && istLesbar(line) && !istFremdzeile(line)) organisationLines.push(line);
+    else verworfen += 1;
   }
+  if (verworfen) notes.push(`${verworfen} Zeile(n) waren nicht zuzuordnen und blieben außen vor.`);
 
   // Bleibt nur eine einzige Zeile übrig, ist sie eher die Organisation.
   if (!organisationLines.length && personLines.length > 1) {

@@ -26,18 +26,24 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
 1. **Eingang oder Ausgang** wählen — das ist die erste Entscheidung und ändert,
    welche Felder erscheinen.
 2. **Umschlag fotografieren.** Die Kamera geht auf, Sie halten die Sendung so,
-   dass das ganze Anschriftenfeld das Bild füllt. Nach ein bis drei Sekunden
-   erscheinen Vorschläge: der große Adressblock wird als **Empfänger**
-   übernommen, eine kleine Absenderzeile darüber als **Absender**.
-3. **Eigene Stelle antippen.** Über den Feldern der eigenen Seite stehen die
+   dass das ganze Anschriftenfeld das Bild füllt.
+3. **Rahmen auf die Anschrift ziehen**, dann **„Bereich erkennen“**. Der Rahmen
+   lässt sich verschieben und an den vier Punkten aufziehen. Je enger er sitzt,
+   desto schneller und sicherer das Ergebnis – bei einem Paketetikett ist das der
+   größte Unterschied überhaupt. Passt das ganze Bild, genügt **„Ganzes Bild“**.
+   Nach ein bis drei Sekunden erscheinen Vorschläge: der große Adressblock wird
+   als **Empfänger** übernommen, eine kleine Absenderzeile darüber als
+   **Absender**. Steht auf der Sendung ausdrücklich „Empfänger“ oder „Absender“
+   — wie auf Paketetiketten —, gilt diese Beschriftung.
+4. **Eigene Stelle antippen.** Über den Feldern der eigenen Seite stehen die
    gemerkten Stellen des Hauses. Ein Tipp füllt Name, Organisation, Anschrift und
    — beim Ausgang — das PSP-Element.
-4. **Vorschläge prüfen.** Falsches überschreiben, Fehlendes ergänzen. Was leer
+5. **Vorschläge prüfen.** Falsches überschreiben, Fehlendes ergänzen. Was leer
    blieb, war nicht lesbar — das ist in Ordnung. Fehlt eine Seite ganz, lässt sie
    sich mit **„nur diese Seite“** einzeln nachfotografieren.
-5. **Beschreibung und Sendungsart** eintragen.
-6. **Beim Ausgang:** Porto und, wenn nicht schon übernommen, das PSP-Element.
-7. **Speichern.** Die Maske steht sofort wieder bereit für die nächste Sendung.
+6. **Beschreibung und Sendungsart** eintragen.
+7. **Beim Ausgang:** Porto und, wenn nicht schon übernommen, das PSP-Element.
+8. **Speichern.** Die Maske steht sofort wieder bereit für die nächste Sendung.
 
 ### Die eigene Stelle einmal merken
 
@@ -46,7 +52,7 @@ etwa „Erwerbung“ mit Anschrift und PSP-Element — und drücken Sie
 **„★ als interne Stelle merken“**. Ab dann genügt ein Fingertipp, auf jedem
 Gerät. Das ist der Weg, auf dem die eigene Seite nie wieder getippt werden muss.
 
-## Sechs Dinge, auf die es ankommt
+## Sieben Dinge, auf die es ankommt
 
 **Bei ungeöffneter Post ist „Inhalt unbekannt“ die richtige Angabe.** Aus einem
 verschlossenen Umschlag lässt sich der Inhalt nicht erschließen. Bitte nicht
@@ -56,6 +62,11 @@ im Postbuch ist schlechter als ein leerer.
 **Die Erkennung schlägt vor, Sie entscheiden.** Sie liest, was sie zu lesen
 glaubt. Bei Knick, Stempel, schlechtem Licht oder Handschrift liegt sie daneben.
 Was Sie speichern, ist Ihre Angabe — nicht die der Maschine.
+
+**Lieber leer als falsch.** War die Erkennung unsicher, füllt sie kein Feld und
+sagt es: „nichts Sicheres gefunden“. Dann bitte näher heran und den Rahmen enger
+ziehen, oder tippen. Das ist Absicht — ein Feld voller Unsinn kostet mehr Zeit
+als ein leeres.
 
 **Porto: leer und 0,00 € sind nicht dasselbe.** Leer heißt „nicht bekannt“.
 0,00 € heißt „ausdrücklich portofrei“. Die Abrechnung wertet das unterschiedlich,
@@ -98,6 +109,7 @@ schief angesehen; das Verfahren ist genau dafür gebaut.
 | Was Sie sehen | Was zu tun ist |
 |---|---|
 | „Keine lokale Texterkennung“ | Von Hand erfassen, weitermachen. Bitte melden. |
+| „nichts Sicheres gefunden“ | Rahmen enger auf die Anschrift ziehen und erneut erkennen. Hilft das nicht: von Hand erfassen. |
 | Kamera geht nicht auf | App schließen und neu öffnen. Hilft das nicht: melden, von Hand erfassen. |
 | „Eintrag wurde zwischenzeitlich geändert“ | Jemand anderes hat denselben Eintrag bearbeitet. Zurück, neu laden, Änderung noch einmal machen. |
 | Warteschlange wird nicht leer | Melden. Die erfassten Sendungen sind nicht verloren, sie liegen auf dem Gerät. |

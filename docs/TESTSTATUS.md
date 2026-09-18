@@ -1,6 +1,6 @@
 # Teststatus
 
-Stand 17.09.2026.
+Stand 18.09.2026.
 
 ## Ergebnis
 
@@ -9,9 +9,9 @@ Stand 17.09.2026.
 | Fachkern (`tests/test_domain.py`) | 38 | bestanden |
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
-| Adressparser und Portokorpus (`tests/js/`) | 17 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 4 | bestanden |
-| **Summe** | **103** | **bestanden** |
+| Adressparser und Portokorpus (`tests/js/`) | 24 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 8 | bestanden |
+| **Summe** | **114** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -64,10 +64,22 @@ Frankierzeilen und Sendungsnummern, Postfach, Auslandsanschrift mit Länderzeile
 Paketetikett ohne Person. Bei unleserlicher Vorlage bleiben die Felder **leer**
 und die Zuversicht niedrig – es wird nichts erfunden.
 
+**Paketetiketten.** Beschriftungen („Empfänger“, „Absender“, auch englisch und
+ohne Umlaute) bestimmen die Zuordnung; ohne sie gilt die Umschlagsregel.
+Frachtführer, Feldbeschriftungen wie „Referenz“ oder „Gewicht“, Haftungssätze
+und Strichcode-Reste landen in **keinem** Feld. Reines Rauschen füllt nichts.
+Nachgewiesen an einer erfundenen Vorlage, die der Bauform eines echten Etiketts
+nachgebildet ist – im Textparser und zusätzlich am erzeugten Etikettenbild im
+Browser.
+
 **Durchlauf im Browser.** Erfassen, Wiederfinden über Mehrwortsuche, Berichtigen
 mit Begründung, Entstehen der zweiten Fassung, Portosumme in der Liste,
 Abweisung eines ungültigen Portobetrags. Auf einem Ansichtsfenster in
 Telefongröße, ohne Fehler in der Browserkonsole.
+
+**Zuschnitt.** Der Rahmen lässt sich mit dem Zeiger an den Griffen über das
+ganze Bild aufziehen; erkannt wird der Ausschnitt. Im Browser nachgewiesen, samt
+der Umrechnung von Anteilen in Bildpunkte.
 
 **Texterkennung, örtlich.** Auf einem erzeugten Prüfumschlag: Tesseract mit
 deutschen Sprachdaten, vollständig im Browser, **1,4 Sekunden**, Zuversicht 90 %.
@@ -83,7 +95,12 @@ Bauumgebung beurteilen:
 
 * **Erkennungsgüte an echter Post.** Der Prüfumschlag ist erzeugter, sauberer
   Druck. Fensterumschläge, Paketetiketten, Stempel, Knicke, schlechtes Licht und
-  Handschrift sind etwas anderes.
+  Handschrift sind etwas anderes. An einem einzelnen echten Paketetikett gemessen:
+  ganzes Etikett 28 % Zuversicht in 4144 ms, nur der Adressblock 62 % in 469 ms.
+  Ein Etikett ist keine Messreihe; der Pilotbetrieb muss das prüfen.
+* **Der Zuschnitt in der Hand der Poststelle.** Dass der Rahmen am Telefon
+  schnell genug sitzt, ist am Gerät zu beurteilen, nicht im Browser auf einem
+  Entwicklungsrechner.
 * **Dauer auf den tatsächlichen Geräten.** 1,4 Sekunden auf einem
   Entwicklungsrechner sagen nichts über ein vier Jahre altes iPad.
 * **Kamera, Akku, Erwärmung** über einen Vormittag.
@@ -123,3 +140,21 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
    über die Fassung. Behoben.
 7. **Detailansicht zeigte beim Nachladen den alten Stand.** Sah aus wie der
    aktuelle. Behoben: die Ansicht wird zuerst geleert.
+8. **Drei Ansichten lagen übereinander.** Eine eigene `display`-Regel überstimmte
+   das `hidden`-Attribut. In Abfragen auf Attribute unsichtbar, erst im
+   ganzseitigen Bildschirmfoto zu sehen. Behoben, mit eigenem Test.
+9. **Der Hauptadressblock landete stets beim Absender.** Auf einem Umschlag ist
+   der große Block immer der Empfänger – bei eingehender Post stand damit die
+   eigene Anschrift auf der falschen Seite. Der Browsertest hatte das falsche
+   Verhalten festgeschrieben und wurde mitberichtigt.
+10. **„Alles Übrige ist die Organisation“.** Diese Auffangregel im Parser war die
+    unmittelbare Ursache dafür, dass auf einem echten Paketetikett Frachtangaben
+    und Strichcode-Reste in den Adressfeldern standen. Entfernt: nicht
+    zuzuordnende Zeilen werden verworfen und gezählt.
+11. **Strichcode-Reste wurden als Straße gelesen.** „J U 8 1 k“ ergab die Straße
+    „J U 8“, weil kurze Namen als Straßenname durchgingen. Behoben: ein
+    Straßenname muss mindestens ein Wort mit drei Buchstaben enthalten.
+12. **Die Drehung aus den EXIF-Angaben wurde nicht berücksichtigt.**
+    `createImageBitmap` folgt ihr nicht überall; ein quer aufgenommenes
+    Telefonfoto war damit für die Erkennung praktisch unlesbar. Behoben: das Bild
+    wird über ein `<img>`-Element geladen.

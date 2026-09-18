@@ -17,6 +17,8 @@ import {
   looksLikePerson,
   looksLikeOrganisation,
   normalise,
+  parseLabel,
+  istLesbar,
 } from '../../web/js/adressen.js';
 
 test('Postleitzahlzeile in verschiedenen Schreibweisen', () => {
@@ -139,4 +141,114 @@ test('Paketetikett mit Empfänger ohne Person', () => {
   assert.equal(parsed.person, '');
   assert.match(parsed.organisation, /Universitätsklinikum Jena/);
   assert.equal(parsed.street, 'Am Klinikum 1');
+});
+
+// ---------------------------------------------------------------------------
+// Paketetiketten
+//
+// Ein Paketetikett ist kein Fensterumschlag: es benennt die Beteiligten
+// ausdrücklich, und es steht viel darauf, was keine Anschrift ist. Die Vorlagen
+// unten sind erfunden und bilden nach, was die Texterkennung an einem echten
+// Etikett geliefert hat – Strichcodes als Buchstabensalat, Feldbeschriftungen,
+// Haftungssätze.
+// ---------------------------------------------------------------------------
+
+const ETIKETT_MIT_ANKERN = [
+  'DPD Deutschland GmbH',
+  'ORT B4 0222',
+  'lIl|Ilj 0H8Y',
+  'Empfänger:',
+  'Musterverlag GmbH',
+  'Frau Anna Beispiel',
+  'Tiergartenstr. 17',
+  '69121 Heidelberg',
+  'Absender:',
+  'Thüringer Universitäts- und Landesbibliothek',
+  'Bibliotheksplatz 2',
+  '07743 Jena',
+  'Referenz 1: 4711-0815',
+  'Gewicht 22,00 kg',
+  'Schäden müssen innerhalb von 7 Tagen gemeldet werden',
+  '%(0Lj8 W1N',
+];
+
+test('Etikett: Beschriftungen trennen Empfänger und Absender', () => {
+  const ergebnis = parseLabel(ETIKETT_MIT_ANKERN.join('\n'));
+  assert.equal(ergebnis.ankerGefunden, true);
+  assert.equal(ergebnis.empfaenger.postalCode, '69121');
+  assert.equal(ergebnis.empfaenger.city, 'Heidelberg');
+  assert.match(ergebnis.empfaenger.organisation, /Musterverlag GmbH/);
+  assert.equal(ergebnis.empfaenger.person, 'Anna Beispiel');
+  assert.equal(ergebnis.absender.postalCode, '07743');
+  assert.match(ergebnis.absender.organisation, /Landesbibliothek/);
+});
+
+test('Etikett: Frachtführer, Feldbeschriftungen und Fließtext bleiben draußen', () => {
+  const ergebnis = parseLabel(ETIKETT_MIT_ANKERN.join('\n'));
+  const felder = [
+    ergebnis.empfaenger.address,
+    ergebnis.absender.address,
+    ergebnis.empfaenger.organisation,
+    ergebnis.absender.organisation,
+  ].join(' | ');
+  for (const fremd of ['DPD', 'Referenz', 'Gewicht', 'gemeldet', 'W1N', '0H8Y', 'ORT B4']) {
+    assert.ok(!felder.includes(fremd), `„${fremd}“ gehört nicht in ein Adressfeld`);
+  }
+});
+
+test('Etikett: Buchstabensalat aus Strichcodes fällt durch die Lesbarkeitsprüfung', () => {
+  assert.equal(istLesbar('lIl|Ilj 0H8Y'), false);
+  assert.equal(istLesbar('%(0Lj8 W1N'), false);
+  assert.equal(istLesbar('J U 8 1 k'), false);
+  assert.equal(istLesbar('0207'), false);
+  assert.equal(istLesbar('Musterverlag GmbH'), true);
+  assert.equal(istLesbar('07743 Jena'), true);
+  assert.equal(istLesbar('Am Steiger 3'), true);
+});
+
+test('Etikett ohne Beschriftungen fällt auf die Umschlagsregel zurück', () => {
+  const ergebnis = parseLabel(
+    [
+      'Springer Nature GmbH · Tiergartenstr. 17 · 69121 Heidelberg',
+      'Thüringer Universitäts- und Landesbibliothek',
+      'Bibliotheksplatz 2',
+      '07743 Jena',
+    ].join('\n'),
+  );
+  assert.equal(ergebnis.ankerGefunden, false);
+  assert.equal(ergebnis.empfaenger.postalCode, '07743');
+  assert.equal(ergebnis.absender.postalCode, '69121');
+  assert.match(ergebnis.absender.organisation, /Springer Nature/);
+});
+
+test('Reines Rauschen füllt nichts', () => {
+  const ergebnis = parseLabel(['lIl|Ilj 0H8Y', '%(0Lj8 W1N', 'J U 8 1 k', '0207'].join('\n'));
+  assert.equal(ergebnis.empfaenger.address, '');
+  assert.equal(ergebnis.absender.address, '');
+  assert.equal(ergebnis.empfaenger.confidence, 0);
+});
+
+test('Ohne Postleitzahl und Straße wird keine Zeile zur Organisation befördert', () => {
+  const parsed = parseAddress(['Sendung wurde sortiert', 'zugestellt am dienstag'].join('\n'));
+  assert.equal(parsed.organisation, '');
+  assert.equal(parsed.person, '');
+  assert.equal(parsed.address, '');
+});
+
+test('Etikett: Beschriftung mit Angabe in derselben Zeile', () => {
+  const ergebnis = parseLabel(
+    [
+      'Empfanger: Musterverlag GmbH',        // ohne Umlaut, wie oft erkannt
+      'Tiergartenstr. 17',
+      '69121 Heidelberg',
+      'Absender Landesbibliothek Jena',
+      'Bibliotheksplatz 2',
+      '07743 Jena',
+    ].join('\n'),
+  );
+  assert.equal(ergebnis.ankerGefunden, true);
+  assert.match(ergebnis.empfaenger.organisation, /Musterverlag GmbH/);
+  assert.equal(ergebnis.empfaenger.city, 'Heidelberg');
+  assert.match(ergebnis.absender.organisation, /Landesbibliothek Jena/);
+  assert.equal(ergebnis.absender.city, 'Jena');
 });

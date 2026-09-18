@@ -111,9 +111,33 @@
                 Texterkennung wird geprüft …
               </p>
             </div>
+            <div id="zuschnitt" class="zuschnitt" hidden>
+              <p class="hint">
+                <strong>Rahmen auf das Anschriftenfeld ziehen.</strong> Je enger der Rahmen, desto
+                schneller und sicherer die Erkennung – auf einem Paketetikett ist das der größte
+                Unterschied.
+              </p>
+              <div class="zuschnitt__buehne">
+                <canvas id="zuschnitt-bild" class="zuschnitt__bild"></canvas>
+                <div id="zuschnitt-rahmen" class="rahmen">
+                  <span class="rahmen__griff rahmen__griff--nw" data-griff="nw"></span>
+                  <span class="rahmen__griff rahmen__griff--ne" data-griff="ne"></span>
+                  <span class="rahmen__griff rahmen__griff--sw" data-griff="sw"></span>
+                  <span class="rahmen__griff rahmen__griff--se" data-griff="se"></span>
+                </div>
+              </div>
+              <div class="zuschnitt__aktionen">
+                <button type="button" id="zuschnitt-erkennen" class="primary">
+                  Bereich erkennen
+                </button>
+                <button type="button" id="zuschnitt-ganz">Ganzes Bild</button>
+                <button type="button" id="zuschnitt-abbrechen">Abbrechen</button>
+              </div>
+            </div>
             <p class="hint">
               Der große Adressblock wird als Empfänger übernommen, eine Absenderzeile darüber
-              als Absender. Jede Seite lässt sich unten auch einzeln fotografieren.
+              als Absender. Trägt das Bild Beschriftungen wie „Empfänger“ oder „Absender“, gelten
+              diese. Jede Seite lässt sich unten auch einzeln fotografieren.
             </p>
             <details id="ocr-ergebnis" hidden>
               <summary>Erkannter Text</summary>

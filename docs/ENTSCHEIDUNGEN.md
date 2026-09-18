@@ -173,3 +173,56 @@ als ein falscher, aber berichtigter Eintrag.
 nicht die Technik. Aufbewahrungsfristen und Löschkonzept sind mit Archiv,
 Datenschutz und Justiziariat zu klären. Eine Änderungshistorie allein ist keine
 Revisionssicherheit.
+
+---
+
+## E09 · Zuschnitt vor der Erkennung (18.09.2026)
+
+**Entscheidung.** Zwischen Aufnahme und Erkennung liegt ein Rahmen, den die
+erfassende Person auf das Anschriftenfeld zieht. Erkannt wird nur der Ausschnitt.
+
+**Begründung.** An einem echten Paketetikett gemessen:
+
+| erkannter Bereich | Zuversicht | Dauer |
+|---|---|---|
+| ganzes Etikett | 28 % | 4144 ms |
+| Etikett ohne Rand | 45 % | 1691 ms |
+| nur der Adressblock | **62 %** | **469 ms** |
+
+Höhere Auflösung half nicht (1600/2400/3200 Pixel Kantenlänge ergaben 27–30 %),
+der Ausschnitt half achtfach in der Zeit und verdoppelte die Zuversicht. Ein
+Paketetikett trägt Frachtangaben, Strichcodes und Haftungstexte in zwei
+Leserichtungen; alles davon ist für die Erkennung Störung. Kein Kunstgriff in
+der Nachbearbeitung wiegt das auf.
+
+**Preis.** Ein Handgriff mehr je Sendung. Er ersetzt aber das Berichtigen von
+Feldern, die mit Unsinn gefüllt waren, und ist damit voraussichtlich schneller.
+Der Erhebungsbogen des Pilotbetriebs misst das.
+
+**Zurückzunehmen, wenn.** Der Pilotbetrieb zeigt, dass der Rahmen mehr Zeit
+kostet als er spart – dann tritt eine automatische Feldsuche an seine Stelle, mit
+dem Rahmen als Rückfall.
+
+---
+
+## E10 · Beschriftungen vor Anordnung, und nichts erfinden (18.09.2026)
+
+**Entscheidung.** Trägt ein Bild Beschriftungen wie „Empfänger“ oder „Absender“,
+bestimmen diese die Zuordnung; nur ohne sie gilt die Umschlagsregel (großer
+Block = Empfänger, kleine Zeile darüber = Absender). Zeilen, die weder Name,
+Organisation, Straße, Postleitzahl noch Ort sein können, werden verworfen und
+gezählt, nicht eingetragen. War die Erkennung unsicher **und** ergibt das
+Ergebnis keine vollständige Anschrift, bleibt jedes Feld leer und die Oberfläche
+sagt das.
+
+**Begründung.** Zuvor galt: „alles Übrige ist die Organisation“. Damit landete
+auf einem Paketetikett der Frachtführer im Organisationsfeld und Strichcode-Reste
+in der Anschrift. Die Zuversicht je Zeile hilft nicht weiter – gemessen trug
+„DELISprint“ 61 %, der richtig gelesene Nachname 34 %. Nur die Form der Zeile
+trägt.
+
+**Preis.** Gelegentlich bleibt ein ungewöhnlich geschriebener Organisationsname
+außen vor und muss getippt werden.
+
+**Zurückzunehmen, wenn.** Nichts davon. Ein leeres Feld ist im Postbuch
+richtig, ein falsch gefülltes ist ein Nachweisfehler.

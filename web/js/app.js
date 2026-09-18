@@ -13,8 +13,8 @@
 
 import { store, requestPersistence } from './db.js';
 import { api, ApiError, flushQueue, refreshFromServer, uuid } from './api.js';
-import { recogniseText, engineStatus } from './ocr.js';
-import { parseAddress } from './adressen.js';
+import { recogniseText, engineStatus, ladeBild } from './ocr.js';
+import { parseAddress, parseLabel } from './adressen.js';
 import { parsePostage, displayPostage } from './porto.js';
 
 const $ = (id) => document.getElementById(id);
@@ -561,30 +561,186 @@ async function initOcr() {
 
 const ZIELWORT = { umschlag: 'Umschlag', absender: 'Absender', empfaenger: 'Empfänger' };
 
-async function runOcr(file, ziel = 'umschlag') {
+/* ------------------------------------------------------------------ *
+ * Zuschnitt vor der Erkennung
+ *
+ * Der Ausschnitt ist die wirksamste Maßnahme überhaupt. An einem echten
+ * Paketetikett gemessen: das ganze Etikett wurde mit 28 % Zuversicht in 4,1 s
+ * gelesen, der Adressblock allein mit 62 % in 0,5 s – und nur im zweiten Fall
+ * standen brauchbare Angaben im Ergebnis. Höhere Auflösung half nicht, der
+ * Ausschnitt half achtfach. Deshalb steht zwischen Aufnahme und Erkennung ein
+ * Rahmen, den die erfassende Person auf das Anschriftenfeld zieht.
+ * ------------------------------------------------------------------ */
+
+const zuschnitt = {
+  blob: null,
+  ziel: 'umschlag',
+  rahmen: { x: 0.06, y: 0.2, w: 0.88, h: 0.5 },
+  zug: null,
+};
+
+const MINDESTANTEIL = 0.1;
+
+function begrenze(wert, min, max) {
+  return Math.max(min, Math.min(max, wert));
+}
+
+/** Zeigt das aufgenommene Bild mit dem Rahmen darüber. */
+async function zeigeZuschnitt(file, ziel) {
+  const bereich = $('zuschnitt');
+  try {
+    const bild = await ladeBild(file);
+    const leinwand = $('zuschnitt-bild');
+    const kante = 1200;
+    const faktor = Math.min(1, kante / Math.max(bild.naturalWidth, bild.naturalHeight));
+    leinwand.width = Math.max(1, Math.round(bild.naturalWidth * faktor));
+    leinwand.height = Math.max(1, Math.round(bild.naturalHeight * faktor));
+    leinwand.getContext('2d').drawImage(bild, 0, 0, leinwand.width, leinwand.height);
+  } catch (error) {
+    // Lässt sich das Bild nicht anzeigen, wird ohne Zuschnitt erkannt.
+    await runOcr(file, ziel);
+    return;
+  }
+  zuschnitt.blob = file;
+  zuschnitt.ziel = ziel;
+  zuschnitt.rahmen = { x: 0.06, y: 0.2, w: 0.88, h: 0.5 };
+  zeichneRahmen();
+  bereich.hidden = false;
+  $('ocr-status').textContent =
+    `Rahmen auf das Anschriftenfeld ziehen (${ZIELWORT[ziel]}), dann „Bereich erkennen“.`;
+  bereich.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+function zeichneRahmen() {
+  const rahmen = $('zuschnitt-rahmen');
+  const { x, y, w, h } = zuschnitt.rahmen;
+  rahmen.style.left = `${x * 100}%`;
+  rahmen.style.top = `${y * 100}%`;
+  rahmen.style.width = `${w * 100}%`;
+  rahmen.style.height = `${h * 100}%`;
+}
+
+function beendeZuschnitt() {
+  $('zuschnitt').hidden = true;
+  zuschnitt.blob = null;
+  zuschnitt.zug = null;
+}
+
+/** Verschieben und Ziehen des Rahmens, mit Maus wie mit dem Finger. */
+function wireZuschnitt() {
+  const buehne = document.querySelector('.zuschnitt__buehne');
+  const rahmen = $('zuschnitt-rahmen');
+
+  const anteil = (event) => {
+    const box = buehne.getBoundingClientRect();
+    return { x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height };
+  };
+
+  const start = (event) => {
+    const griff = event.target.dataset?.griff;
+    zuschnitt.zug = { griff: griff || 'move', punkt: anteil(event), rahmen: { ...zuschnitt.rahmen } };
+    event.target.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  };
+
+  rahmen.addEventListener('pointerdown', start);
+
+  const bewege = (event) => {
+    const zug = zuschnitt.zug;
+    if (!zug) return;
+    const jetzt = anteil(event);
+    const dx = jetzt.x - zug.punkt.x;
+    const dy = jetzt.y - zug.punkt.y;
+    const alt = zug.rahmen;
+    if (zug.griff === 'move') {
+      zuschnitt.rahmen = {
+        ...alt,
+        x: begrenze(alt.x + dx, 0, 1 - alt.w),
+        y: begrenze(alt.y + dy, 0, 1 - alt.h),
+      };
+    } else {
+      const links = zug.griff.includes('w');
+      const oben = zug.griff.includes('n');
+      let { x, y, w, h } = alt;
+      if (links) {
+        const neu = begrenze(alt.x + dx, 0, alt.x + alt.w - MINDESTANTEIL);
+        w = alt.x + alt.w - neu;
+        x = neu;
+      } else {
+        w = begrenze(alt.w + dx, MINDESTANTEIL, 1 - alt.x);
+      }
+      if (oben) {
+        const neu = begrenze(alt.y + dy, 0, alt.y + alt.h - MINDESTANTEIL);
+        h = alt.y + alt.h - neu;
+        y = neu;
+      } else {
+        h = begrenze(alt.h + dy, MINDESTANTEIL, 1 - alt.y);
+      }
+      zuschnitt.rahmen = { x, y, w, h };
+    }
+    zeichneRahmen();
+    event.preventDefault();
+  };
+
+  const ende = () => { zuschnitt.zug = null; };
+  for (const ziel of [rahmen, window]) {
+    ziel.addEventListener('pointermove', bewege);
+    ziel.addEventListener('pointerup', ende);
+    ziel.addEventListener('pointercancel', ende);
+  }
+
+  $('zuschnitt-erkennen').addEventListener('click', async () => {
+    const { blob, ziel, rahmen: ausschnitt } = zuschnitt;
+    if (!blob) return;
+    beendeZuschnitt();
+    await runOcr(blob, ziel, ausschnitt);
+  });
+  $('zuschnitt-ganz').addEventListener('click', async () => {
+    const { blob, ziel } = zuschnitt;
+    if (!blob) return;
+    beendeZuschnitt();
+    await runOcr(blob, ziel);
+  });
+  $('zuschnitt-abbrechen').addEventListener('click', () => {
+    beendeZuschnitt();
+    $('ocr-status').textContent = 'Abgebrochen. Die Felder lassen sich von Hand ausfüllen.';
+  });
+}
+
+async function runOcr(file, ziel = 'umschlag', crop = null) {
   const status = $('ocr-status');
   const started = Date.now();
   status.textContent = `Erkennung läuft (${ZIELWORT[ziel]}) …`;
   try {
-    const result = await recogniseText(file);
+    const result = await recogniseText(file, crop ? { crop } : {});
     if (!result) {
       status.textContent =
         'Keine lokale Texterkennung verfügbar. Bitte die Felder von Hand ausfüllen.';
       return;
     }
-    const parsed = parseAddress(result.text);
-    state.form.ocr = { ...result, parsed };
+    // Ein Bild des ganzen Umschlags oder Etiketts wird als Etikett gelesen: mit
+    // Beschriftungen als Anker, sonst nach der Umschlagsregel. Ein Bild einer
+    // einzelnen Seite ist eine Anschrift und nichts weiter.
+    const einzeln = ziel !== 'umschlag';
+    const gelesen = einzeln ? parseAddress(result.text) : parseLabel(result.text);
+    const haupt = einzeln ? gelesen : gelesen.empfaenger;
+    state.form.ocr = { ...result, parsed: haupt, etikett: einzeln ? null : gelesen };
 
     $('ocr-text').textContent = result.text || '(kein Text erkannt)';
     $('ocr-herkunft').textContent =
       `${result.source} · ${result.model} · ${result.durationMs} ms · ` +
       `Zuversicht der Erkennung ${(result.confidence * 100).toFixed(0)} %` +
-      (parsed.notes.length ? ` · ${parsed.notes.join(' ')}` : '');
+      (gelesen.notes.length ? ` · ${gelesen.notes.join(' ')}` : '');
     $('ocr-ergebnis').hidden = false;
     $('ocr-ergebnis').open = true;
 
-    applySuggestion(parsed, ziel);
-    status.textContent = `Erkannt in ${((Date.now() - started) / 1000).toFixed(1)} s. Bitte prüfen und bei Bedarf berichtigen.`;
+    const uebernommen = applySuggestion(gelesen, ziel, result);
+    const dauer = `${((Date.now() - started) / 1000).toFixed(1)} s`;
+    status.textContent = uebernommen
+      ? `Erkannt in ${dauer}. Bitte prüfen und bei Bedarf berichtigen.`
+      : `In ${dauer} gelesen, aber nichts Sicheres gefunden – nichts übernommen. ` +
+        'Bitte näher an das Anschriftenfeld gehen, sodass es das Bild füllt, ' +
+        'oder die Felder von Hand ausfüllen. Der erkannte Text steht unten.';
   } catch (error) {
     status.textContent = `Erkennung fehlgeschlagen: ${error.message}. Bitte von Hand ausfüllen.`;
   }
@@ -602,32 +758,71 @@ function fuelleSeite(seite, quelle) {
   suggestContacts(seite);
 }
 
+/** Unterhalb dieser Zuversicht muss das Ergebnis für sich sprechen. */
+const ERKENNUNGSSCHWELLE = 0.55;
+
+/**
+ * Entscheidet, ob ein Ergebnis gut genug ist, um in ein Feld zu wandern.
+ *
+ * Gemessen an einem echten Paketetikett: das ganze Etikett wurde mit 28 %
+ * Zuversicht gelesen, allein der Adressblock mit 62 %. Bei niedriger Zuversicht
+ * ist das Ergebnis meist Unsinn – dann wird nur übernommen, was in sich eine
+ * Anschrift ergibt: Postleitzahl und dazu Straße, Organisation oder Name.
+ * Nichts einzutragen ist besser als etwas Falsches einzutragen.
+ */
+function istBrauchbar(teil, erkennung) {
+  if (!teil) return false;
+  if (!teil.address) return false;
+  if (erkennung.confidence >= ERKENNUNGSSCHWELLE) return true;
+  return Boolean(teil.postalCode && (teil.street || teil.organisation || teil.person));
+}
+
 /**
  * Trägt erkannte Angaben ein.
  *
- * @param parsed Ergebnis von parseAddress
- * @param ziel   'umschlag' für ein Bild des ganzen Umschlags, sonst die Seite,
- *               die gemeint ist ('absender' oder 'empfaenger').
+ * @param gelesen   Ergebnis von parseLabel (ganzer Umschlag) oder parseAddress
+ *                  (einzelne Seite).
+ * @param ziel      'umschlag' für ein Bild des ganzen Umschlags oder Etiketts,
+ *                  sonst die gemeinte Seite ('absender' oder 'empfaenger').
+ * @param erkennung Rohergebnis der Texterkennung, wegen der Zuversicht.
+ * @returns {boolean} true, wenn mindestens ein Feld gefüllt wurde.
  *
  * Beim ganzen Umschlag gilt: **der große Adressblock ist der Empfänger, die
  * kleine Zeile darüber der Absender** – bei Eingang wie bei Ausgang. Das folgt
  * aus der Bauform des Umschlags, nicht aus der Richtung der Sendung. Genau hier
  * lag zuvor ein Fehler: der Hauptblock landete stets beim Absender, bei
- * eingehender Post also die eigene Anschrift auf der falschen Seite.
+ * eingehender Post also die eigene Anschrift auf der falschen Seite. Trägt das
+ * Bild ausdrückliche Beschriftungen („Empfänger“, „Absender“), gelten sie vor
+ * dieser Regel – ein Paketetikett sagt selbst, wer wer ist.
  */
-function applySuggestion(parsed, ziel = 'umschlag') {
+function applySuggestion(gelesen, ziel = 'umschlag', erkennung = { confidence: 1 }) {
+  let etwas = false;
   if (ziel === 'umschlag') {
-    fuelleSeite('empfaenger', parsed);
-    if (parsed.returnLine) {
-      const zeilen = parsed.returnLine.replace(/\s*[·•]\s*/g, '\n').replace(/\s+[-–]\s+/g, '\n');
-      const abgetrennt = parseAddress(zeilen);
-      fuelleSeite('absender', abgetrennt.postalCode ? abgetrennt : { address: zeilen });
+    if (istBrauchbar(gelesen.empfaenger, erkennung)) {
+      fuelleSeite('empfaenger', gelesen.empfaenger);
+      etwas = true;
     }
-  } else {
-    fuelleSeite(ziel, parsed);
+    if (istBrauchbar(gelesen.absender, erkennung)) {
+      fuelleSeite('absender', gelesen.absender);
+      etwas = true;
+    } else if (!gelesen.ankerGefunden && gelesen.empfaenger.returnLine) {
+      // Die Rücksendezeile des Fensterumschlags steht in einer Zeile. Ließ sie
+      // sich nicht zerlegen, wandert sie unzerlegt in das Anschriftenfeld.
+      const zeilen = gelesen.empfaenger.returnLine
+        .replace(/\s*[·•]\s*/g, '\n')
+        .replace(/\s+[-–]\s+/g, '\n');
+      fuelleSeite('absender', { address: zeilen });
+      etwas = true;
+    }
+  } else if (istBrauchbar(gelesen, erkennung)) {
+    fuelleSeite(ziel, gelesen);
+    etwas = true;
   }
-  if (parsed.shipmentType && !$('art').value) $('art').value = parsed.shipmentType;
-  state.dirty = true;
+
+  const art = ziel === 'umschlag' ? gelesen.empfaenger.shipmentType : gelesen.shipmentType;
+  if (art && !$('art').value) $('art').value = art;
+  if (etwas) state.dirty = true;
+  return etwas;
 }
 
 /* ------------------------------------------------------------------ *
@@ -914,7 +1109,7 @@ function wire() {
     $(`foto-${seite}`).addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
       event.target.value = '';
-      if (file) await runOcr(file, seite);
+      if (file) await zeigeZuschnitt(file, seite);
     });
   }
 
@@ -922,8 +1117,9 @@ function wire() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    await runOcr(file, 'umschlag');
-    // Das Erkennungsfoto wird nicht gespeichert: es diente nur dem Auslesen.
+    // Erst der Ausschnitt, dann die Erkennung. Das Erkennungsfoto wird nicht
+    // gespeichert: es diente nur dem Auslesen.
+    await zeigeZuschnitt(file, 'umschlag');
   });
 
   $('foto-beleg').addEventListener('change', (event) => {
@@ -953,6 +1149,7 @@ function wire() {
 
 async function start() {
   wire();
+  wireZuschnitt();
   renderConnection();
   state.form = blankForm();
 

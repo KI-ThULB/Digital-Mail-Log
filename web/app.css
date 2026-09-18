@@ -308,6 +308,41 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--gruen); 
 @media (prefers-color-scheme: dark) { .capture__button span { color: #06100f; } }
 .capture__button--small span { min-height: var(--tap); background: transparent; color: var(--text); border: 1px solid var(--linie); }
 
+/* ---------- Zuschnitt vor der Erkennung ---------- */
+
+.zuschnitt { margin-top: 12px; }
+.zuschnitt__buehne {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 8px;
+  background: #000;
+  line-height: 0;
+  touch-action: none; /* sonst scrollt die Seite beim Ziehen */
+}
+.zuschnitt__bild { display: block; max-width: 100%; height: auto; }
+
+.rahmen {
+  position: absolute;
+  border: 2px solid var(--gruen-hell, #7fd1c1);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  cursor: move;
+}
+.rahmen__griff {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  background: var(--gruen-hell, #7fd1c1);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  touch-action: none;
+}
+.rahmen__griff--nw { left: -17px; top: -17px; cursor: nwse-resize; }
+.rahmen__griff--ne { right: -17px; top: -17px; cursor: nesw-resize; }
+.rahmen__griff--sw { left: -17px; bottom: -17px; cursor: nesw-resize; }
+.rahmen__griff--se { right: -17px; bottom: -17px; cursor: nwse-resize; }
+.zuschnitt__aktionen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
 .ocr-text {
   white-space: pre-wrap;
   word-break: break-word;

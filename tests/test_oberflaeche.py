@@ -78,6 +78,55 @@ def _envelope_png(path: Path) -> Path:
     return path
 
 
+def _parcel_label_png(path: Path) -> Path:
+    """Erzeugt ein erfundenes Paketetikett als Prüfbild.
+
+    Nachgebaut ist die Bauform, die an einem echten Etikett Schwierigkeiten
+    machte: Beschriftungen für beide Seiten, dazwischen Feldangaben des
+    Frachtführers und Zeichenfolgen, wie die Erkennung sie aus Strichcodes
+    liest. Die Anschriften sind erfunden.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    image = Image.new("RGB", (1000, 1000), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([6, 6, 994, 994], outline="black", width=4)
+
+    def font(size):
+        for name in (
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        ):
+            if Path(name).exists():
+                return ImageFont.truetype(name, size)
+        return ImageFont.load_default()
+
+    zeilen = [
+        (40, "Paketdienst Musterfracht GmbH", 26),
+        (80, "lIl|Ilj 0H8Y %(0Lj8", 26),
+        (140, "Empfaenger:", 30),
+        (180, "Musterverlag GmbH", 36),
+        (226, "Frau Anna Beispiel", 36),
+        (272, "Tiergartenstr. 17", 36),
+        (318, "69121 Heidelberg", 36),
+        (390, "Absender:", 30),
+        (430, "Landesbibliothek Jena", 36),
+        (476, "Bibliotheksplatz 2", 36),
+        (522, "07743 Jena", 36),
+        (600, "Referenz 1: 4711-0815", 26),
+        (640, "Gewicht 22,00 kg", 26),
+        (680, "Schaeden muessen innerhalb von 7 Tagen gemeldet werden", 22),
+    ]
+    for y, text, groesse in zeilen:
+        draw.text((60, y), text, font=font(groesse), fill="black")
+    # Ein Feld voller Strichcode-Rauschen, wie es unten auf Etiketten steht.
+    for index in range(6):
+        draw.text((60, 740 + index * 34), "J U 8 1 k %s Wl1N 0207" % ("|" * (index + 3)),
+                  font=font(24), fill="black")
+    image.save(path)
+    return path
+
+
 @unittest.skipIf(sync_playwright is None, "Playwright ist nicht installiert.")
 class BrowserFlow(unittest.TestCase):
     @classmethod
@@ -242,6 +291,31 @@ class BrowserFlow(unittest.TestCase):
         page.wait_for_selector("#formular-fehler:not([hidden])")
         self.assertIn("Tausendertrennzeichen", page.text_content("#formular-fehler"))
 
+    def _rahmen_aufziehen(self):
+        """Zieht den Zuschnittrahmen an zwei Griffen über das ganze Bild."""
+        page = self.page
+        # Der Bereich wird sanft ins Bild gerollt; erst danach stehen die Maße fest.
+        page.wait_for_timeout(800)
+        buehne = page.query_selector(".zuschnitt__buehne").bounding_box()
+
+        def ziehen(griff, x, y):
+            box = page.query_selector(griff).bounding_box()
+            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            page.mouse.down()
+            page.mouse.move(x, y, steps=4)
+            page.mouse.up()
+
+        ziehen(".rahmen__griff--nw", buehne["x"] - 40, buehne["y"] - 40)
+        ziehen(".rahmen__griff--se", buehne["x"] + buehne["width"] + 40, buehne["y"] + buehne["height"] + 40)
+        anteil = page.evaluate(
+            """() => {
+                const b = document.querySelector('.zuschnitt__buehne').getBoundingClientRect();
+                const r = document.getElementById('zuschnitt-rahmen').getBoundingClientRect();
+                return (r.width / b.width) * (r.height / b.height);
+            }"""
+        )
+        self.assertGreater(anteil, 0.9, "Der Rahmen muss sich bis an den Rand ziehen lassen")
+
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
     )
@@ -253,6 +327,14 @@ class BrowserFlow(unittest.TestCase):
             page.wait_for_selector("#kennung:not(:empty)")
             page.click("#neu")
             page.set_input_files("#foto-erkennung", str(image))
+
+            # Zwischen Aufnahme und Erkennung liegt der Zuschnitt. Beim Testbild
+            # ist die ganze Fläche das Anschriftenfeld, also wird der Rahmen an
+            # den Griffen aufgezogen – das prüft die Griffe und die Rechnung
+            # zugleich – und dann der Ausschnitt erkannt.
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+            self._rahmen_aufziehen()
+            page.click("#zuschnitt-erkennen")
             page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
 
             erkannt = page.text_content("#ocr-text")
@@ -276,6 +358,42 @@ class BrowserFlow(unittest.TestCase):
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
     )
+    def test_paketetikett_folgt_den_beschriftungen(self):
+        """Auf einem Etikett gilt die Beschriftung, nicht die Anordnung.
+
+        Anlass war ein echtes Paketetikett: die Erkennung lief, trug aber
+        Frachtpapier-Angaben und Strichcode-Reste in die Adressfelder. Geprüft
+        wird beides – dass die Beschriftungen die Seiten bestimmen und dass das
+        Beiwerk außen bleibt.
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            image = _parcel_label_png(Path(folder) / "etikett.png")
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.set_input_files("#foto-erkennung", str(image))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+            self._rahmen_aufziehen()
+            page.click("#zuschnitt-erkennen")
+            page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
+
+            empfaenger = " | ".join(
+                page.input_value(f"#empfaenger-{feld}") for feld in ("name", "org", "adresse")
+            )
+            absender = " | ".join(
+                page.input_value(f"#absender-{feld}") for feld in ("name", "org", "adresse")
+            )
+            self.assertIn("69121", empfaenger)
+            self.assertIn("07743", absender)
+            self.assertNotIn("07743", empfaenger, "Die Seiten dürfen nicht vertauscht werden")
+
+            for fremd in ("Referenz", "Gewicht", "gemeldet", "Musterfracht", "0207"):
+                self.assertNotIn(fremd, empfaenger + absender, f"{fremd} gehört in kein Adressfeld")
+
+    @unittest.skipUnless(
+        TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
+    )
     def test_foto_je_seite_fuellt_nur_diese_seite(self):
         """Ein Bild, das ausdrücklich für eine Seite aufgenommen wird, gehört dorthin."""
         with tempfile.TemporaryDirectory() as folder:
@@ -285,6 +403,8 @@ class BrowserFlow(unittest.TestCase):
             page.wait_for_selector("#kennung:not(:empty)")
             page.click("#neu")
             page.set_input_files("#foto-absender", str(image))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+            page.click("#zuschnitt-ganz")
             page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
 
             self.assertIn("Bibliotheksplatz", page.input_value("#absender-adresse"))

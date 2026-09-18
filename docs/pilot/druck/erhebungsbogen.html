@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>Erhebungsbogen Praxistest Postbuch</title>
+    <link rel="stylesheet" href="druckstil.css" />
+  </head>
+  <body>
+    <div class="kopf">
+      <div>
+        <div class="kopf__titel">Erhebungsbogen · Praxistest Digitales Postbuch</div>
+        <div class="kopf__zusatz sans" style="text-align: left">
+          Ein Blatt fasst 20 Sendungen · Verfahren siehe docs/pilot/MESSPROTOKOLL.md
+        </div>
+      </div>
+      <div class="kopf__zusatz">
+        Blatt ______ von ______
+      </div>
+    </div>
+
+    <div class="angaben">
+      <div><span>Datum</span></div>
+      <div><span>Erfassende Person</span></div>
+      <div><span>Zeitnehmer/in</span></div>
+      <div><span>Gerät (Modell)</span></div>
+      <div><span>Beginn (Uhrzeit)</span></div>
+      <div><span>Ende (Uhrzeit)</span></div>
+    </div>
+
+    <table class="bogen">
+      <thead>
+        <tr>
+          <th style="width: 8mm">Nr.</th>
+          <th style="width: 12mm">Form</th>
+          <th style="width: 12mm">Weg</th>
+          <th style="width: 18mm">Zeit&nbsp;(s)</th>
+          <th style="width: 18mm">Erk.&nbsp;(s)</th>
+          <th style="width: 13mm">Korr.</th>
+          <th>Bemerkung</th>
+        </tr>
+      </thead>
+      <tbody id="zeilen"></tbody>
+    </table>
+
+    <div class="schluessel">
+      <b>Form</b> &nbsp; <code>F</code> Fensterumschlag &nbsp;·&nbsp;
+      <code>B</code> Briefumschlag bedruckt &nbsp;·&nbsp;
+      <code>P</code> Paketetikett &nbsp;·&nbsp;
+      <code>H</code> handschriftlich &nbsp;·&nbsp;
+      <code>A</code> Ausland<br />
+      <b>Weg</b> &nbsp; <code>E</code> mit Kamera-Erkennung &nbsp;·&nbsp;
+      <code>T</code> nur tippen &nbsp; — abwechselnd, Sendung für Sendung<br />
+      <b>Zeit</b> &nbsp; Sekunden vom Griff zur Sendung bis zum Druck auf „Speichern“ &nbsp;·&nbsp;
+      <b>Erk.</b> die Sekundenzahl, die die App nach der Erkennung anzeigt (nur bei <code>E</code>)<br />
+      <b>Korr.</b> &nbsp; <code>0</code> nichts geändert &nbsp;·&nbsp;
+      <code>1</code> ein Feld berichtigt &nbsp;·&nbsp;
+      <code>2</code> mehrere Felder &nbsp;·&nbsp;
+      <code>3</code> unbrauchbar, alles von Hand
+    </div>
+
+    <div class="halbtag">
+      <div><span>Akkustand zu Beginn / am Ende</span></div>
+      <div><span>Gerät spürbar warm geworden? ja / nein</span></div>
+      <div style="grid-column: 1 / -1; padding-bottom: 7mm">
+        <span>Abbrüche, Hänger, Fehlermeldungen — wortgetreu</span>
+      </div>
+    </div>
+
+    <div class="fuss">
+      Bitte auch das formlose Beiblatt führen: wo gezögert wurde, was gefragt wurde,
+      welcher Handgriff unbequem ist, was fehlt. Diese Anmerkungen sind am Ende oft
+      mehr wert als die Zahlen.
+    </div>
+
+    <script>
+      // Die Zeilen werden erzeugt statt getippt: so bleibt die Zeilenzahl an einer
+      // Stelle änderbar, wenn der Bogen einmal länger oder kürzer werden soll.
+      const koerper = document.getElementById('zeilen');
+      for (let i = 1; i <= 20; i += 1) {
+        const zeile = document.createElement('tr');
+        zeile.innerHTML = `<td class="nr">${i}</td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        koerper.append(zeile);
+      }
+    </script>
+  </body>
+</html>

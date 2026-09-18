@@ -56,10 +56,12 @@ postbuch/     Fachkern, Speicherung, Schnittstelle (Python, ohne Fremdpakete)
 web/          Web-App (HTML, CSS, ES-Module, kein Bauschritt)
 tests/        Fach-, Speicher-, Schnittstellen-, Browser- und Node-Tests
 docs/         Architektur, Betrieb, Entscheidungen, Teststatus, Plan
+docs/pilot/   Messprotokoll, Erhebungsbogen, Handreichung, Kurzpapier für die IT
 archiv/       Abgelöste Entwürfe mit Begründung
 ```
 
-Weiterführend: [Architektur](docs/ARCHITEKTUR.md) ·
+Weiterführend: [Unterlagen für den Pilotbetrieb](docs/pilot/) ·
+[Architektur](docs/ARCHITEKTUR.md) ·
 [Betrieb](docs/BETRIEB.md) · [Entscheidungen](docs/ENTSCHEIDUNGEN.md) ·
 [Entwicklungsplan](docs/ENTWICKLUNGSPLAN.md) · [Teststatus](docs/TESTSTATUS.md)
 

@@ -1,0 +1,166 @@
+/* Druckstil für die Pilotunterlagen.
+ *
+ * A4, Schriften aus dem System — keine Einbindung von außen, damit die Dateien
+ * auch ohne Netz und in zehn Jahren noch gleich aussehen.
+ */
+
+@page {
+  size: A4;
+  margin: 16mm 15mm 14mm 15mm;
+}
+
+:root {
+  --gruen: #205c54;
+  --linie: #b9c6c3;
+  --gedaempft: #5b6b68;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Charter", "Palatino", "Palatino Linotype", Georgia, serif;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: #16211f;
+  hyphens: auto;
+}
+
+h1, h2, h3, th, .sans {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+h1 {
+  font-size: 16pt;
+  margin: 0 0 2mm;
+  color: var(--gruen);
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 11.5pt;
+  margin: 7mm 0 2mm;
+  padding-bottom: 1mm;
+  border-bottom: 0.4pt solid var(--linie);
+  break-after: avoid;
+}
+
+h3 {
+  font-size: 10pt;
+  margin: 5mm 0 1.5mm;
+  break-after: avoid;
+}
+
+p { margin: 0 0 2.5mm; }
+ul, ol { margin: 0 0 3mm; padding-left: 5mm; }
+li { margin-bottom: 1mm; }
+
+strong { font-weight: 700; }
+code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; }
+
+hr { border: none; border-top: 0.4pt solid var(--linie); margin: 5mm 0; }
+
+blockquote {
+  margin: 3mm 0;
+  padding: 2.5mm 4mm;
+  border-left: 1.2pt solid var(--gruen);
+  background: #f2f6f5;
+  break-inside: avoid;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 4mm;
+  font-size: 9.5pt;
+}
+th, td {
+  border: 0.4pt solid var(--linie);
+  padding: 1.4mm 2mm;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #eef3f2;
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1.2pt solid var(--gruen);
+  padding-bottom: 2mm;
+  margin-bottom: 4mm;
+}
+.kopf__titel { font-size: 15pt; font-weight: 700; color: var(--gruen); }
+.kopf__zusatz { font-size: 8.5pt; color: var(--gedaempft); text-align: right; }
+
+.fuss {
+  margin-top: 5mm;
+  padding-top: 2mm;
+  border-top: 0.4pt solid var(--linie);
+  font-size: 8pt;
+  color: var(--gedaempft);
+}
+
+/* ---------- Bestandteile des Erhebungsbogens ---------- */
+
+.angaben {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2mm 5mm;
+  margin-bottom: 4mm;
+  font-size: 9pt;
+}
+.angaben > div { border-bottom: 0.4pt solid #6b7a77; padding-bottom: 3.5mm; }
+.angaben span {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gedaempft);
+}
+
+table.bogen { font-size: 9pt; }
+table.bogen th { text-align: center; padding: 1.2mm 1mm; }
+table.bogen td { height: 7.2mm; padding: 0; }
+table.bogen tbody tr:nth-child(5n) td { border-bottom-width: 0.9pt; }
+table.bogen td.nr {
+  text-align: right;
+  padding-right: 1.5mm;
+  color: var(--gedaempft);
+  font-size: 8pt;
+  background: #f6f9f8;
+}
+
+.schluessel {
+  font-size: 8pt;
+  line-height: 1.5;
+  background: #f2f6f5;
+  border: 0.4pt solid var(--linie);
+  padding: 2.5mm 3mm;
+  break-inside: avoid;
+}
+.schluessel b { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.halbtag {
+  margin-top: 3mm;
+  font-size: 8.5pt;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2mm 5mm;
+  break-inside: avoid;
+}
+.halbtag > div { border-bottom: 0.4pt solid #6b7a77; padding-bottom: 3.5mm; }
+.halbtag span {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gedaempft);
+}

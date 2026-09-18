@@ -47,6 +47,10 @@ der Änderungshistorie.
 
 ### M1 · Praxistest in der Poststelle *(dringend, 2–3 Tage)*
 
+Unterlagen dafür liegen bereit: [Messprotokoll mit Entscheidungsregel](pilot/MESSPROTOKOLL.md),
+[Erhebungsbogen](pilot/ERHEBUNGSBOGEN.pdf) und
+[Handreichung für die Poststelle](pilot/HANDREICHUNG-POSTSTELLE.md).
+
 Vor jeder weiteren Programmierung. Die Web-App auf einem internen Server, auf
 zwei Geräten installiert, eine Woche echte Post – oder, wenn die offenen Punkte
 aus `docs/BETRIEB.md` Abschnitt 8 noch nicht geklärt sind, freigegebene
@@ -70,6 +74,8 @@ Ergebnis ist eine Entscheidung: bleibt es bei der Web-App, oder rechtfertigen di
 Zahlen eine native App?
 
 ### M2 · Anmeldung einrichten *(1 Woche, mit der IT)*
+
+Zum Weiterleiten: [Kurzpapier für die IT](pilot/KURZPAPIER-IT.md).
 
 Vorschaltserver mit TLS und der Anmeldung der Einrichtung, Rollendatei,
 Prüfung auf Fälschbarkeit des Kopffelds (`docs/BETRIEB.md`, Abschnitt 2).

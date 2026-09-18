@@ -25,14 +25,26 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
 
 1. **Eingang oder Ausgang** wählen — das ist die erste Entscheidung und ändert,
    welche Felder erscheinen.
-2. **Adresse fotografieren.** Die Kamera geht auf, Sie halten die Sendung so,
-   dass das Anschriftenfeld das Bild füllt. Nach ein bis drei Sekunden erscheinen
-   Vorschläge.
-3. **Vorschläge prüfen.** Falsches überschreiben, Fehlendes ergänzen. Was leer
-   blieb, war nicht lesbar — das ist in Ordnung.
-4. **Beschreibung und Sendungsart** eintragen.
-5. **Beim Ausgang:** Porto und, wenn bekannt, das PSP-Element.
-6. **Speichern.** Die Maske steht sofort wieder bereit für die nächste Sendung.
+2. **Umschlag fotografieren.** Die Kamera geht auf, Sie halten die Sendung so,
+   dass das ganze Anschriftenfeld das Bild füllt. Nach ein bis drei Sekunden
+   erscheinen Vorschläge: der große Adressblock wird als **Empfänger**
+   übernommen, eine kleine Absenderzeile darüber als **Absender**.
+3. **Eigene Stelle antippen.** Über den Feldern der eigenen Seite stehen die
+   gemerkten Stellen des Hauses. Ein Tipp füllt Name, Organisation, Anschrift und
+   — beim Ausgang — das PSP-Element.
+4. **Vorschläge prüfen.** Falsches überschreiben, Fehlendes ergänzen. Was leer
+   blieb, war nicht lesbar — das ist in Ordnung. Fehlt eine Seite ganz, lässt sie
+   sich mit **„nur diese Seite“** einzeln nachfotografieren.
+5. **Beschreibung und Sendungsart** eintragen.
+6. **Beim Ausgang:** Porto und, wenn nicht schon übernommen, das PSP-Element.
+7. **Speichern.** Die Maske steht sofort wieder bereit für die nächste Sendung.
+
+### Die eigene Stelle einmal merken
+
+Beim ersten Mal steht die Schnellwahl leer. Tragen Sie die Stelle einmal ein —
+etwa „Erwerbung“ mit Anschrift und PSP-Element — und drücken Sie
+**„★ als interne Stelle merken“**. Ab dann genügt ein Fingertipp, auf jedem
+Gerät. Das ist der Weg, auf dem die eigene Seite nie wieder getippt werden muss.
 
 ## Sechs Dinge, auf die es ankommt
 

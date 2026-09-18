@@ -38,7 +38,11 @@ const state = {
   filter: { direction: '', query: '', date_from: '', date_to: '', shipment_type: '', withCancelled: false },
   form: null,
   dirty: false,
+  interneKontakte: [],
 };
+
+/** Die Seite, auf der die eigene Einrichtung steht: beim Ausgang der Absender. */
+const interneSeite = () => (state.form?.direction === 'outgoing' ? 'absender' : 'empfaenger');
 
 /* ------------------------------------------------------------------ *
  * Formatierung
@@ -279,11 +283,117 @@ function applyDirection(direction, { silent = false } = {}) {
     button.setAttribute('aria-pressed', String(active));
   }
   $('kosten').hidden = !outgoing;
-  $('label-absender').textContent = outgoing ? 'Absender (intern)' : 'Absender';
-  $('label-empfaenger').textContent = outgoing ? 'Empfänger' : 'Empfänger (intern)';
+
+  const intern = outgoing ? 'absender' : 'empfaenger';
+  const extern = outgoing ? 'empfaenger' : 'absender';
+  $(`${intern}-rolle`).textContent = 'die eigene Einrichtung';
+  $(`${extern}-rolle`).textContent = 'auswärtig';
+  // Die auswärtige Seite zuerst: sie ist die veränderliche und damit die
+  // eigentliche Arbeit. Die eigene Stelle steht meist mit einem Tipp fest.
+  $(`partei-${extern}`).style.order = '1';
+  $(`partei-${intern}`).style.order = '2';
+  $(`merken-${intern}`).hidden = false;
+  $(`merken-${extern}`).hidden = true;
   $('beteiligte-legende').textContent = outgoing
     ? 'Beteiligte – wichtig ist der Empfänger'
     : 'Beteiligte – wichtig ist der Absender';
+  renderSchnellwahl();
+}
+
+/* ------------------------------------------------------------------ *
+ * Interne Stellen: Schnellwahl statt Tippen
+ * ------------------------------------------------------------------ */
+
+/**
+ * Lädt die als intern gekennzeichneten Kontakte.
+ *
+ * Sie sind der Grund, warum die eigene Seite nicht getippt werden muss: eine
+ * Poststelle hat ein gutes Dutzend eigener Stellen, und die ändern sich selten.
+ * Der zuletzt geholte Stand bleibt lokal liegen, damit die Schnellwahl auch
+ * ohne Verbindung dasteht.
+ */
+async function ladeInterneKontakte() {
+  let liste = (await store.getMeta('interne_kontakte', [])) || [];
+  if (navigator.onLine) {
+    try {
+      const { contacts } = await api.contacts();
+      liste = contacts.filter((kontakt) => kontakt.internal);
+      await store.setMeta('interne_kontakte', liste);
+    } catch {
+      /* Serverstand nicht erreichbar – der lokale genügt. */
+    }
+  }
+  state.interneKontakte = liste;
+  renderSchnellwahl();
+}
+
+function renderSchnellwahl() {
+  const intern = interneSeite();
+  for (const seite of ['absender', 'empfaenger']) {
+    const kasten = $(`${seite}-schnellwahl`);
+    if (seite !== intern) {
+      kasten.hidden = true;
+      kasten.replaceChildren();
+      continue;
+    }
+    if (!state.interneKontakte.length) {
+      // Sichtbar bleiben statt zu verschwinden: sonst findet niemand heraus,
+      // dass es die Schnellwahl gibt und wie sie sich füllt.
+      kasten.hidden = false;
+      kasten.replaceChildren(
+        el('span', {
+          class: 'hint',
+          text: 'Noch keine eigene Stelle gemerkt. Angaben unten eintragen und „★ als interne Stelle merken“ drücken — dann steht sie künftig auf einen Fingertipp bereit.',
+        }),
+      );
+      continue;
+    }
+    const gewaehlt = state.form?.[seite === 'absender' ? 'sender' : 'recipient']?.contact_id;
+    kasten.hidden = false;
+    kasten.replaceChildren(
+      el('span', { class: 'schnellwahl__wort', text: 'Eigene Stelle:' }),
+      ...state.interneKontakte.map((kontakt) =>
+        el('button', {
+          type: 'button',
+          // Kurz beschriftet: die Organisation ist bei allen eigenen Stellen
+          // dieselbe und würde die Schaltfläche über zwei Zeilen ziehen. Der
+          // vollständige Name steht im Tooltip.
+          class: `chip${kontakt.id === gewaehlt ? ' is-active' : ''}`,
+          title: kontakt.label || '',
+          text: kontakt.name || kontakt.organisation,
+          onclick: () => takeContact(seite, kontakt),
+        }),
+      ),
+    );
+  }
+}
+
+/** Merkt die eingetragene Stelle für künftige Erfassungen vor. */
+async function merkeAlsIntern(seite) {
+  const name = $(`${seite}-name`).value.trim();
+  const organisation = $(`${seite}-org`).value.trim();
+  if (!name && !organisation) {
+    flash('Bitte zuerst Name oder Organisation eintragen.');
+    return;
+  }
+  if (!navigator.onLine) {
+    flash('Ohne Verbindung lässt sich keine interne Stelle anlegen.');
+    return;
+  }
+  try {
+    const kontakt = await api.saveContact({
+      name,
+      organisation,
+      address: $(`${seite}-adresse`).value.trim(),
+      psp_element: $('psp').value.trim() || null,
+      internal: true,
+    });
+    state.form[seite === 'absender' ? 'sender' : 'recipient'].contact_id = kontakt.id;
+    await ladeInterneKontakte();
+    flash(`„${kontakt.label}“ steht jetzt in der Schnellwahl.`);
+  } catch (error) {
+    flash(`Konnte nicht gemerkt werden: ${error.message}`);
+  }
 }
 
 function readForm() {
@@ -449,10 +559,12 @@ async function initOcr() {
   }
 }
 
-async function runOcr(file) {
+const ZIELWORT = { umschlag: 'Umschlag', absender: 'Absender', empfaenger: 'Empfänger' };
+
+async function runOcr(file, ziel = 'umschlag') {
   const status = $('ocr-status');
   const started = Date.now();
-  status.textContent = 'Erkennung läuft …';
+  status.textContent = `Erkennung läuft (${ZIELWORT[ziel]}) …`;
   try {
     const result = await recogniseText(file);
     if (!result) {
@@ -471,37 +583,51 @@ async function runOcr(file) {
     $('ocr-ergebnis').hidden = false;
     $('ocr-ergebnis').open = true;
 
-    applySuggestion(parsed);
+    applySuggestion(parsed, ziel);
     status.textContent = `Erkannt in ${((Date.now() - started) / 1000).toFixed(1)} s. Bitte prüfen und bei Bedarf berichtigen.`;
   } catch (error) {
     status.textContent = `Erkennung fehlgeschlagen: ${error.message}. Bitte von Hand ausfüllen.`;
   }
 }
 
-/** Trägt erkannte Angaben in die noch leeren Felder der Gegenseite ein. */
-function applySuggestion(parsed) {
-  const outgoing = state.form.direction === 'outgoing';
-  const prefix = outgoing ? 'empfaenger' : 'absender';
-  const targets = {
-    name: $(`${prefix}-name`),
-    org: $(`${prefix}-org`),
-    address: $(`${prefix}-adresse`),
-  };
+/** Füllt eine Seite aus einem Erkennungsergebnis, ohne Vorhandenes zu überschreiben. */
+function fuelleSeite(seite, quelle) {
+  const name = $(`${seite}-name`);
+  const organisation = $(`${seite}-org`);
+  const anschrift = $(`${seite}-adresse`);
+  if (quelle.person && !name.value) name.value = quelle.person;
+  if (quelle.organisation && !organisation.value) organisation.value = quelle.organisation;
+  if (!name.value && quelle.organisation) name.value = quelle.organisation;
+  if (quelle.address && !anschrift.value) anschrift.value = quelle.address;
+  suggestContacts(seite);
+}
 
-  if (parsed.person && !targets.name.value) targets.name.value = parsed.person;
-  if (parsed.organisation && !targets.org.value) targets.org.value = parsed.organisation;
-  if (!targets.name.value && parsed.organisation) targets.name.value = parsed.organisation;
-  if (parsed.address && !targets.address.value) targets.address.value = parsed.address;
-  if (parsed.shipmentType && !$('art').value) $('art').value = parsed.shipmentType;
-
-  if (parsed.returnLine && !outgoing) {
-    // Die Rücksendezeile des Fensterumschlags nennt oft den Absender.
-    const other = $('absender-adresse');
-    if (!other.value) other.value = parsed.returnLine.replace(/\s*[·•]\s*/g, '\n');
+/**
+ * Trägt erkannte Angaben ein.
+ *
+ * @param parsed Ergebnis von parseAddress
+ * @param ziel   'umschlag' für ein Bild des ganzen Umschlags, sonst die Seite,
+ *               die gemeint ist ('absender' oder 'empfaenger').
+ *
+ * Beim ganzen Umschlag gilt: **der große Adressblock ist der Empfänger, die
+ * kleine Zeile darüber der Absender** – bei Eingang wie bei Ausgang. Das folgt
+ * aus der Bauform des Umschlags, nicht aus der Richtung der Sendung. Genau hier
+ * lag zuvor ein Fehler: der Hauptblock landete stets beim Absender, bei
+ * eingehender Post also die eigene Anschrift auf der falschen Seite.
+ */
+function applySuggestion(parsed, ziel = 'umschlag') {
+  if (ziel === 'umschlag') {
+    fuelleSeite('empfaenger', parsed);
+    if (parsed.returnLine) {
+      const zeilen = parsed.returnLine.replace(/\s*[·•]\s*/g, '\n').replace(/\s+[-–]\s+/g, '\n');
+      const abgetrennt = parseAddress(zeilen);
+      fuelleSeite('absender', abgetrennt.postalCode ? abgetrennt : { address: zeilen });
+    }
+  } else {
+    fuelleSeite(ziel, parsed);
   }
-
+  if (parsed.shipmentType && !$('art').value) $('art').value = parsed.shipmentType;
   state.dirty = true;
-  suggestContacts(prefix);
 }
 
 /* ------------------------------------------------------------------ *
@@ -546,6 +672,7 @@ function takeContact(prefix, contact) {
   if (contact.psp_element && !$('psp').value) $('psp').value = contact.psp_element;
   $(`${prefix}-vorschlaege`).replaceChildren();
   state.dirty = true;
+  renderSchnellwahl();
 }
 
 /* ------------------------------------------------------------------ *
@@ -780,16 +907,22 @@ function wire() {
   $('stornieren').addEventListener('click', cancelEntry);
   $('jetzt-uebertragen').addEventListener('click', () => synchronise());
 
-  $('absender-name').addEventListener('input', () => suggestContacts('absender'));
-  $('absender-org').addEventListener('input', () => suggestContacts('absender'));
-  $('empfaenger-name').addEventListener('input', () => suggestContacts('empfaenger'));
-  $('empfaenger-org').addEventListener('input', () => suggestContacts('empfaenger'));
+  for (const seite of ['absender', 'empfaenger']) {
+    $(`${seite}-name`).addEventListener('input', () => suggestContacts(seite));
+    $(`${seite}-org`).addEventListener('input', () => suggestContacts(seite));
+    $(`merken-${seite}`).addEventListener('click', () => merkeAlsIntern(seite));
+    $(`foto-${seite}`).addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (file) await runOcr(file, seite);
+    });
+  }
 
   $('foto-erkennung').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    await runOcr(file);
+    await runOcr(file, 'umschlag');
     // Das Erkennungsfoto wird nicht gespeichert: es diente nur dem Auslesen.
   });
 
@@ -852,6 +985,7 @@ async function start() {
     : 'Lokaler Speicher ohne Dauerzusage';
 
   await initOcr();
+  await ladeInterneKontakte();
   await loadEntries();
   await synchronise({ quiet: true });
 

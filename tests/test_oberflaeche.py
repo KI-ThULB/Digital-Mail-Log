@@ -29,6 +29,7 @@ except ImportError:  # pragma: no cover
     sync_playwright = None
 
 from postbuch.api import Application
+from postbuch.domain import Contact
 from postbuch.server import StaticFiles
 from postbuch.storage import Store
 
@@ -85,6 +86,17 @@ class BrowserFlow(unittest.TestCase):
         cls.store = Store(
             str(Path(cls.tmp.name) / "postbuch.sqlite3"),
             photo_dir=str(Path(cls.tmp.name) / "fotos"),
+        )
+        cls.store.save_contact(
+            Contact(
+                id="intern-erwerbung",
+                organisation="Thüringer Universitäts- und Landesbibliothek",
+                name="Erwerbung",
+                address="Bibliotheksplatz 2\n07743 Jena",
+                psp_element="001.A-02",
+                internal=True,
+            ),
+            "prueflauf",
         )
         app = StaticFiles(
             Application(cls.store, development_user="prueflauf", default_role="verwalten"), WEB
@@ -248,11 +260,58 @@ class BrowserFlow(unittest.TestCase):
             self.assertIn("07743", erkannt)
             self.assertIn("auf dem Gerät", page.text_content("#ocr-status") + " auf dem Gerät")
 
-            adresse = page.input_value("#absender-adresse")
-            self.assertIn("07743", adresse)
-            self.assertIn("Bibliotheksplatz", adresse)
-            # Die Absenderzeile des Fensterumschlags darf nicht in der Anschrift landen
-            self.assertNotIn("10115", adresse)
+            # Der große Adressblock ist der Empfänger – auf jedem Umschlag,
+            # unabhängig von der Richtung der Sendung.
+            empfaenger = page.input_value("#empfaenger-adresse")
+            self.assertIn("07743", empfaenger)
+            self.assertIn("Bibliotheksplatz", empfaenger)
+            self.assertNotIn("10115", empfaenger, "Absenderzeile gehört nicht zum Empfänger")
+
+            # Die kleine Zeile darüber ist der Absender und wird eigens zerlegt.
+            absender = page.input_value("#absender-adresse")
+            self.assertIn("10115", absender)
+            self.assertIn("Musterverlag", page.input_value("#absender-org") + absender)
+            self.assertNotIn("Bibliotheksplatz", absender)
+
+    @unittest.skipUnless(
+        TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
+    )
+    def test_foto_je_seite_fuellt_nur_diese_seite(self):
+        """Ein Bild, das ausdrücklich für eine Seite aufgenommen wird, gehört dorthin."""
+        with tempfile.TemporaryDirectory() as folder:
+            image = _envelope_png(Path(folder) / "umschlag.png")
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.set_input_files("#foto-absender", str(image))
+            page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
+
+            self.assertIn("Bibliotheksplatz", page.input_value("#absender-adresse"))
+            self.assertEqual(page.input_value("#empfaenger-adresse"), "")
+
+    def test_interne_stelle_per_schnellwahl(self):
+        page = self.page
+        page.goto(self.base)
+        page.wait_for_selector("#kennung:not(:empty)")
+        page.click("#neu")
+
+        # Eingang: die eigene Einrichtung ist der Empfänger.
+        page.wait_for_selector("#empfaenger-schnellwahl:not([hidden])")
+        self.assertTrue(page.is_hidden("#absender-schnellwahl"))
+        page.click("#empfaenger-schnellwahl button.chip")
+        self.assertIn("Landesbibliothek", page.input_value("#empfaenger-org"))
+        self.assertIn("07743", page.input_value("#empfaenger-adresse"))
+
+        # Ausgang: die eigene Einrichtung wechselt auf die Absenderseite.
+        page.click('[data-richtung-wahl="outgoing"]')
+        page.wait_for_selector("#absender-schnellwahl:not([hidden])")
+        self.assertTrue(page.is_hidden("#empfaenger-schnellwahl"))
+        page.click("#absender-schnellwahl button.chip")
+        self.assertIn("Landesbibliothek", page.input_value("#absender-org"))
+        # Das hinterlegte PSP-Element wird beim Ausgang gleich mit übernommen.
+        self.assertEqual(page.input_value("#psp"), "001.A-02")
+        self.assertEqual(self.errors, [])
 
 
 if __name__ == "__main__":

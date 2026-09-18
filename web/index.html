@@ -105,12 +105,16 @@
             <div class="capture">
               <label class="capture__button">
                 <input id="foto-erkennung" type="file" accept="image/*" capture="environment" />
-                <span>📷 Adresse fotografieren</span>
+                <span>📷 Umschlag fotografieren</span>
               </label>
               <p id="ocr-status" class="hint" role="status" aria-live="polite">
                 Texterkennung wird geprüft …
               </p>
             </div>
+            <p class="hint">
+              Der große Adressblock wird als Empfänger übernommen, eine Absenderzeile darüber
+              als Absender. Jede Seite lässt sich unten auch einzeln fotografieren.
+            </p>
             <details id="ocr-ergebnis" hidden>
               <summary>Erkannter Text</summary>
               <pre id="ocr-text" class="ocr-text"></pre>
@@ -118,37 +122,67 @@
             </details>
           </fieldset>
 
-          <fieldset class="card">
+          <fieldset class="card" id="beteiligte">
             <legend id="beteiligte-legende">Beteiligte</legend>
-            <div class="grid">
-              <label class="field">
-                <span id="label-absender">Absender</span>
-                <input id="absender-name" type="text" autocomplete="off" placeholder="Name oder Organisation" />
-              </label>
-              <label class="field">
-                <span>Organisation (Absender)</span>
-                <input id="absender-org" type="text" autocomplete="off" />
-              </label>
-              <label class="field field--wide">
-                <span>Anschrift (Absender)</span>
-                <textarea id="absender-adresse" rows="3"></textarea>
-              </label>
-              <div id="absender-vorschlaege" class="suggestions" aria-live="polite"></div>
+            <div class="parteien">
+            <div class="partei" id="partei-absender">
+              <div class="partei__kopf">
+                <h2 id="label-absender">Absender</h2>
+                <span id="absender-rolle" class="partei__rolle"></span>
+                <label class="minikamera">
+                  <input id="foto-absender" type="file" accept="image/*" capture="environment" />
+                  <span>📷 nur diese Seite</span>
+                </label>
+                <button type="button" class="ghost klein" id="merken-absender" hidden>
+                  ★ als interne Stelle merken
+                </button>
+              </div>
+              <div id="absender-schnellwahl" class="schnellwahl" aria-live="polite" hidden></div>
+              <div class="grid">
+                <label class="field">
+                  <span>Name</span>
+                  <input id="absender-name" type="text" autocomplete="off" placeholder="Person oder Stelle" />
+                </label>
+                <label class="field">
+                  <span>Organisation</span>
+                  <input id="absender-org" type="text" autocomplete="off" />
+                </label>
+                <label class="field field--wide">
+                  <span>Anschrift</span>
+                  <textarea id="absender-adresse" rows="3"></textarea>
+                </label>
+                <div id="absender-vorschlaege" class="suggestions" aria-live="polite"></div>
+              </div>
             </div>
-            <div class="grid">
-              <label class="field">
-                <span id="label-empfaenger">Empfänger</span>
-                <input id="empfaenger-name" type="text" autocomplete="off" placeholder="Name oder Organisation" />
-              </label>
-              <label class="field">
-                <span>Organisation (Empfänger)</span>
-                <input id="empfaenger-org" type="text" autocomplete="off" />
-              </label>
-              <label class="field field--wide">
-                <span>Anschrift (Empfänger)</span>
-                <textarea id="empfaenger-adresse" rows="3"></textarea>
-              </label>
-              <div id="empfaenger-vorschlaege" class="suggestions" aria-live="polite"></div>
+            <div class="partei" id="partei-empfaenger">
+              <div class="partei__kopf">
+                <h2 id="label-empfaenger">Empfänger</h2>
+                <span id="empfaenger-rolle" class="partei__rolle"></span>
+                <label class="minikamera">
+                  <input id="foto-empfaenger" type="file" accept="image/*" capture="environment" />
+                  <span>📷 nur diese Seite</span>
+                </label>
+                <button type="button" class="ghost klein" id="merken-empfaenger" hidden>
+                  ★ als interne Stelle merken
+                </button>
+              </div>
+              <div id="empfaenger-schnellwahl" class="schnellwahl" aria-live="polite" hidden></div>
+              <div class="grid">
+                <label class="field">
+                  <span>Name</span>
+                  <input id="empfaenger-name" type="text" autocomplete="off" placeholder="Person oder Stelle" />
+                </label>
+                <label class="field">
+                  <span>Organisation</span>
+                  <input id="empfaenger-org" type="text" autocomplete="off" />
+                </label>
+                <label class="field field--wide">
+                  <span>Anschrift</span>
+                  <textarea id="empfaenger-adresse" rows="3"></textarea>
+                </label>
+                <div id="empfaenger-vorschlaege" class="suggestions" aria-live="polite"></div>
+              </div>
+            </div>
             </div>
           </fieldset>
 

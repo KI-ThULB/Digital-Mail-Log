@@ -411,3 +411,89 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--gruen); 
   body { background: #fff; }
   .entry, .card { box-shadow: none; break-inside: avoid; }
 }
+
+/* ---------- Beteiligte: zwei Seiten mit eigenen Bedienelementen ---------- */
+
+/* Die Reihenfolge wird je Richtung gesetzt: die auswärtige Seite zuerst, weil
+ * sie die veränderliche ist. Der Umweg über einen Behälter ist nötig, weil ein
+ * fieldset mit display:flex seine legend falsch setzt. */
+.parteien { display: flex; flex-direction: column; gap: 20px; }
+
+.partei + .partei { padding-top: 20px; border-top: 1px dashed var(--linie); }
+
+.partei__kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.partei__kopf h2 { font-size: 1rem; margin: 0; }
+.partei__rolle {
+  font-size: 0.78rem;
+  color: var(--gedaempft);
+  border: 1px solid var(--linie);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+
+.minikamera { margin-left: auto; }
+.minikamera input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.minikamera span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--gruen);
+  border-radius: var(--radius);
+  color: var(--gruen);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.minikamera input:focus-visible + span { outline: 3px solid var(--gruen); outline-offset: 2px; }
+
+button.ghost.klein { min-height: 40px; font-size: 0.85rem; padding: 0 12px; }
+
+.schnellwahl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: color-mix(in srgb, var(--gruen) 8%, transparent);
+  border-radius: var(--radius);
+}
+.schnellwahl__wort {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--gedaempft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+button.chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--gruen);
+  border-radius: 999px;
+  background: var(--papier);
+  color: var(--gruen);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+button.chip:hover { background: var(--gruen); color: var(--papier); }
+
+@media (max-width: 640px) {
+  .partei__kopf { gap: 8px; }
+  .minikamera { margin-left: 0; width: 100%; }
+  .minikamera span { width: 100%; justify-content: center; }
+  button.ghost.klein { width: 100%; justify-content: center; }
+}
+
+button.chip.is-active {
+  background: var(--gruen);
+  color: var(--papier);
+  border-color: var(--gruen);
+}
+@media (prefers-color-scheme: dark) { button.chip.is-active { color: #06100f; } }

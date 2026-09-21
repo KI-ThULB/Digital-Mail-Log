@@ -116,23 +116,29 @@ verschiedene Wege.
 
 ### Der Weg vom Bild zum Feld
 
-1. **Zuschnitt.** Die erfassende Person zieht einen Rahmen auf das
-   Anschriftenfeld; erkannt wird nur dieser Ausschnitt (`crop` als Anteile des
-   Bildes, also unabhängig von der Auflösung). Das ist der wirksamste Schritt der
-   ganzen Kette, siehe E09 in `docs/ENTSCHEIDUNGEN.md`.
+1. **Markieren.** Die erfassende Person zieht je ein Rechteck über die Anschrift
+   des Empfängers und des Absenders und benennt damit die Seite. Erkannt wird nur
+   der markierte Ausschnitt (`crop` als Anteile des Bildes, also unabhängig von
+   der Auflösung), jeder Bereich für sich. Das ist der wirksamste Schritt der
+   ganzen Kette: es macht die Fläche klein **und** nimmt der Maschine das Deuten
+   ab. Siehe E09 und E11 in `docs/ENTSCHEIDUNGEN.md`.
 2. **Vorbereiten.** `prepareImage` lädt das Bild über ein `<img>`-Element, damit
    die Drehung aus den EXIF-Angaben berücksichtigt wird – ein um 90° gedrehtes
    Bild ist praktisch unlesbar –, schneidet zu, verkleinert auf 1600 Pixel
    Kantenlänge und entsättigt.
 3. **Erkennen.** Der Anschluss liefert Text, Dauer und Zuversicht.
-4. **Zerlegen.** `parseLabel` sucht zuerst Beschriftungen („Empfänger“,
-   „Absender“, auch englisch und ohne Umlaute, wie die Erkennung sie oft liest)
-   und folgt ihnen. Ohne Beschriftungen gilt die Umschlagsregel. Zeilen, die
-   keine Anschrift sein können – Strichcode-Reste, Frachtangaben, Haftungstexte –
-   werden verworfen und gezählt.
+4. **Zerlegen.** Bei einem markierten Bereich steht die Seite fest: der Text
+   wird mit `ohneAnkerbeschriftung` von mitmarkierten Beschriftungen befreit und
+   mit `parseAddress` in Felder zerlegt. Ohne Markierung übernimmt `parseLabel`:
+   es sucht zuerst Beschriftungen („Empfänger“, „Absender“, auch englisch und
+   ohne Umlaute, wie die Erkennung sie oft liest) und folgt ihnen, sonst gilt die
+   Umschlagsregel. Zeilen, die keine Anschrift sein können – Strichcode-Reste,
+   Frachtangaben, Haftungstexte – werden verworfen und gezählt.
 5. **Übernehmen oder nicht.** War die Zuversicht gering **und** ergibt das
    Ergebnis keine vollständige Anschrift, bleibt jedes Feld leer und die
-   Oberfläche sagt es. Siehe E10.
+   Oberfläche sagt es, je Seite einzeln. In einem markierten Bereich genügt ein
+   Anker – Postleitzahl oder Straße –, weil die Markierung selbst eine Aussage
+   ist. Siehe E10 und E11.
 
 ## Rechte
 

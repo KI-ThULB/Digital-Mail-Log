@@ -226,3 +226,39 @@ außen vor und muss getippt werden.
 
 **Zurückzunehmen, wenn.** Nichts davon. Ein leeres Feld ist im Postbuch
 richtig, ein falsch gefülltes ist ein Nachweisfehler.
+
+---
+
+## E11 · Die Beteiligten werden markiert, nicht erraten (21.09.2026)
+
+**Entscheidung.** Nach der Aufnahme markiert die erfassende Person die Bereiche
+selbst und sagt durch die Wahl der Seite, **was** dort steht: ein Rechteck für
+den Empfänger, eines für den Absender. Jeder Bereich wird einzeln erkannt und
+mit `parseAddress` zerlegt. Der Regelweg ist das Markieren; „Ganzes Bild“ bleibt
+als Abkürzung, und dort gilt weiter die automatische Zuordnung nach E10.
+
+**Begründung.** E09 und E10 haben die Erkennung messbar verbessert, im Praxistest
+aber nicht überzeugt. Der Grund liegt in der Aufgabe selbst: die Maschine soll
+aus einer Fläche gleichzeitig **lesen** und **deuten**, welche Zeile zu welcher
+Seite gehört. Das Lesen ist schwer genug. Das Deuten kann der Mensch in einer
+halben Sekunde und fehlerfrei — er sieht die Sendung ja in der Hand.
+
+Damit fällt die ganze Zuordnungslogik als Fehlerquelle weg, und der zweite,
+schon gemessene Gewinn kommt gratis dazu: ein markierter Adressblock ist eine
+kleine Fläche, und kleine Flächen werden schnell und mit hoher Zuversicht
+gelesen (62 % in 469 ms gegen 28 % in 4144 ms).
+
+**Preis.** Ein bis zwei Wischbewegungen je Sendung. Dafür entfällt das
+Berichtigen falsch zugeordneter Felder. Eine Markierung ist zudem eine Aussage
+(„hier steht die Anschrift“), deshalb genügt in einem markierten Bereich ein
+Anker — Postleitzahl oder Straße —, um zu übernehmen; ohne Markierung bleibt die
+strengere Schwelle aus E10.
+
+**Nicht gewählt.** Feldweises Markieren (Name, Organisation, Straße, PLZ/Ort
+einzeln) wäre genauer und bräuchte keinen Parser mehr, verlangt aber vier bis
+acht Rechtecke je Sendung. Im Takt einer Poststelle ist das zu langsam.
+
+**Zurückzunehmen, wenn.** Der Pilotbetrieb zeigt, dass zwei Wischbewegungen je
+Sendung mehr kosten als das Berichtigen. Dann wird erst automatisch versucht und
+nur bei unsicherem Ergebnis zum Markieren aufgefordert — die Technik dafür liegt
+bereits vollständig vor, es wäre eine Änderung im Ablauf, nicht im Kern.

@@ -31,10 +31,12 @@ die Zeit und trägt ein. Sonst misst man das Mitschreiben.
 
 Jede Sendung wird auf **einem** von zwei Wegen erfasst:
 
-- **E** — mit Kamera-Erkennung: fotografieren, Rahmen auf die Anschrift ziehen,
-  erkennen lassen, Vorschlag prüfen, ergänzen. Der Rahmen gehört zur gemessenen
-  Zeit: er ist ein Handgriff mehr, spart aber Berichtigungen (siehe E09 in
-  `docs/ENTSCHEIDUNGEN.md`), und ob diese Rechnung aufgeht, soll der Test zeigen.
+- **E** — mit Kamera-Erkennung: fotografieren, Empfänger- und Absenderbereich
+  markieren, erkennen lassen, Vorschlag prüfen, ergänzen. Das Markieren gehört
+  zur gemessenen Zeit: es sind ein bis zwei Wischbewegungen mehr, die aber das
+  Berichtigen falsch zugeordneter Felder ersparen (E09 und E11 in
+  `docs/ENTSCHEIDUNGEN.md`). Ob diese Rechnung aufgeht, soll der Test zeigen —
+  bitte notieren Sie auffällige Fälle, in denen das Markieren gehakt hat.
 - **T** — nur tippen: Felder von Hand ausfüllen.
 
 **Abwechselnd**, Sendung für Sendung. Nicht erst fünfzig auf einem Weg, dann

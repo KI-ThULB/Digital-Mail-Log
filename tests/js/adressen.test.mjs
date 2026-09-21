@@ -19,6 +19,7 @@ import {
   normalise,
   parseLabel,
   istLesbar,
+  ohneAnkerbeschriftung,
 } from '../../web/js/adressen.js';
 
 test('Postleitzahlzeile in verschiedenen Schreibweisen', () => {
@@ -251,4 +252,27 @@ test('Etikett: Beschriftung mit Angabe in derselben Zeile', () => {
   assert.equal(ergebnis.empfaenger.city, 'Heidelberg');
   assert.match(ergebnis.absender.organisation, /Landesbibliothek Jena/);
   assert.equal(ergebnis.absender.city, 'Jena');
+});
+
+test('Beschriftungen werden aus markierten Bereichen entfernt', () => {
+  const text = ['Empfänger:', 'Musterverlag GmbH', 'Tiergartenstr. 17', '69121 Heidelberg'].join('\n');
+  assert.equal(
+    ohneAnkerbeschriftung(text),
+    ['Musterverlag GmbH', 'Tiergartenstr. 17', '69121 Heidelberg'].join('\n'),
+  );
+  // Steht hinter der Beschriftung noch etwas, bleibt dieser Rest erhalten.
+  assert.equal(ohneAnkerbeschriftung('Absender Landesbibliothek Jena'), 'Landesbibliothek Jena');
+  assert.equal(ohneAnkerbeschriftung('Bibliotheksplatz 2'), 'Bibliotheksplatz 2');
+});
+
+test('Markierter Bereich: die Anschrift wird zerlegt, die Beschriftung nicht übernommen', () => {
+  const parsed = parseAddress(
+    ohneAnkerbeschriftung(
+      ['Empfanger:', 'Musterverlag GmbH', 'Frau Anna Beispiel', 'Tiergartenstr. 17', '69121 Heidelberg'].join('\n'),
+    ),
+  );
+  assert.equal(parsed.postalCode, '69121');
+  assert.equal(parsed.person, 'Anna Beispiel');
+  assert.match(parsed.organisation, /Musterverlag GmbH/);
+  assert.ok(!parsed.address.includes('mpfanger'));
 });

@@ -291,30 +291,26 @@ class BrowserFlow(unittest.TestCase):
         page.wait_for_selector("#formular-fehler:not([hidden])")
         self.assertIn("Tausendertrennzeichen", page.text_content("#formular-fehler"))
 
-    def _rahmen_aufziehen(self):
-        """Zieht den Zuschnittrahmen an zwei Griffen über das ganze Bild."""
+    def _markiere(self, seite, x0, y0, x1, y1):
+        """Markiert einen Bereich für eine Seite, in Anteilen des Bildes."""
         page = self.page
         # Der Bereich wird sanft ins Bild gerollt; erst danach stehen die Maße fest.
         page.wait_for_timeout(800)
+        if not page.is_hidden("#zuschnitt-rollen"):
+            page.click(f'[data-rolle="{seite}"]')
         buehne = page.query_selector(".zuschnitt__buehne").bounding_box()
-
-        def ziehen(griff, x, y):
-            box = page.query_selector(griff).bounding_box()
-            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-            page.mouse.down()
-            page.mouse.move(x, y, steps=4)
-            page.mouse.up()
-
-        ziehen(".rahmen__griff--nw", buehne["x"] - 40, buehne["y"] - 40)
-        ziehen(".rahmen__griff--se", buehne["x"] + buehne["width"] + 40, buehne["y"] + buehne["height"] + 40)
-        anteil = page.evaluate(
-            """() => {
-                const b = document.querySelector('.zuschnitt__buehne').getBoundingClientRect();
-                const r = document.getElementById('zuschnitt-rahmen').getBoundingClientRect();
-                return (r.width / b.width) * (r.height / b.height);
-            }"""
+        page.mouse.move(buehne["x"] + x0 * buehne["width"], buehne["y"] + y0 * buehne["height"])
+        page.mouse.down()
+        page.mouse.move(
+            buehne["x"] + x1 * buehne["width"],
+            buehne["y"] + y1 * buehne["height"],
+            steps=6,
         )
-        self.assertGreater(anteil, 0.9, "Der Rahmen muss sich bis an den Rand ziehen lassen")
+        page.mouse.up()
+        self.assertIsNotNone(
+            page.query_selector(f'[data-bereich="{seite}"]'),
+            f"Der Bereich für {seite} muss nach dem Ziehen stehen",
+        )
 
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
@@ -328,13 +324,11 @@ class BrowserFlow(unittest.TestCase):
             page.click("#neu")
             page.set_input_files("#foto-erkennung", str(image))
 
-            # Zwischen Aufnahme und Erkennung liegt der Zuschnitt. Beim Testbild
-            # ist die ganze Fläche das Anschriftenfeld, also wird der Rahmen an
-            # den Griffen aufgezogen – das prüft die Griffe und die Rechnung
-            # zugleich – und dann der Ausschnitt erkannt.
+            # Ohne Markierung, über „Ganzes Bild“: dann muss die automatische
+            # Zuordnung greifen – großer Block Empfänger, kleine Zeile darüber
+            # Absender.
             page.wait_for_selector("#zuschnitt:not([hidden])")
-            self._rahmen_aufziehen()
-            page.click("#zuschnitt-erkennen")
+            page.click("#zuschnitt-ganz")
             page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
 
             erkannt = page.text_content("#ocr-text")
@@ -374,8 +368,7 @@ class BrowserFlow(unittest.TestCase):
             page.click("#neu")
             page.set_input_files("#foto-erkennung", str(image))
             page.wait_for_selector("#zuschnitt:not([hidden])")
-            self._rahmen_aufziehen()
-            page.click("#zuschnitt-erkennen")
+            page.click("#zuschnitt-ganz")
             page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
 
             empfaenger = " | ".join(
@@ -390,6 +383,56 @@ class BrowserFlow(unittest.TestCase):
 
             for fremd in ("Referenz", "Gewicht", "gemeldet", "Musterfracht", "0207"):
                 self.assertNotIn(fremd, empfaenger + absender, f"{fremd} gehört in kein Adressfeld")
+
+    @unittest.skipUnless(
+        TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
+    )
+    def test_markierte_bereiche_werden_seitenweise_erkannt(self):
+        """Was markiert wurde, entscheidet über die Seite – ohne jedes Raten.
+
+        Der Regelweg: die erfassende Person zieht ein Rechteck über die Anschrift
+        und sagt durch die Wahl der Seite, was dort steht. Die Erkennung liest
+        dann nur noch. Jeder Bereich wird einzeln erkannt, was ihn klein und
+        damit schnell und sicher macht.
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            image = _parcel_label_png(Path(folder) / "etikett.png")
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.set_input_files("#foto-erkennung", str(image))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+
+            # Die Lage der Blöcke im Prüfbild, in Anteilen der Bildhöhe. Die
+            # Reihenfolge ist gleichgültig, deshalb hier der Absender zuerst.
+            self._markiere("absender", 0.04, 0.38, 0.96, 0.58)
+            self._markiere("empfaenger", 0.04, 0.13, 0.96, 0.36)
+            self.assertIn("Empfänger und Absender", page.text_content("#zuschnitt-stand"))
+
+            page.click("#zuschnitt-erkennen")
+            page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
+
+            empfaenger = " | ".join(
+                page.input_value(f"#empfaenger-{feld}") for feld in ("name", "org", "adresse")
+            )
+            absender = " | ".join(
+                page.input_value(f"#absender-{feld}") for feld in ("name", "org", "adresse")
+            )
+            self.assertIn("69121", empfaenger)
+            self.assertIn("Tiergartenstr", empfaenger)
+            self.assertIn("07743", absender)
+            self.assertIn("Bibliotheksplatz", absender)
+            self.assertNotIn("07743", empfaenger, "Die Seiten dürfen nicht vermischt werden")
+
+            # Die Beschriftung lag mit im Rechteck; sie gehört in kein Feld.
+            self.assertNotIn("mpfaenger", empfaenger)
+            self.assertNotIn("bsender", absender)
+
+            # Der Statustext benennt beide Seiten einzeln.
+            status = page.text_content("#ocr-status")
+            self.assertIn("Empfänger:", status)
+            self.assertIn("Absender:", status)
 
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."

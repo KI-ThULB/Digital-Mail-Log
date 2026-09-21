@@ -14,7 +14,7 @@
 import { store, requestPersistence } from './db.js';
 import { api, ApiError, flushQueue, refreshFromServer, uuid } from './api.js';
 import { recogniseText, engineStatus, ladeBild } from './ocr.js';
-import { parseAddress, parseLabel } from './adressen.js';
+import { parseAddress, parseLabel, ohneAnkerbeschriftung } from './adressen.js';
 import { parsePostage, displayPostage } from './porto.js';
 
 const $ = (id) => document.getElementById(id);
@@ -562,30 +562,37 @@ async function initOcr() {
 const ZIELWORT = { umschlag: 'Umschlag', absender: 'Absender', empfaenger: 'Empfänger' };
 
 /* ------------------------------------------------------------------ *
- * Zuschnitt vor der Erkennung
+ * Bereiche markieren
  *
  * Der Ausschnitt ist die wirksamste Maßnahme überhaupt. An einem echten
  * Paketetikett gemessen: das ganze Etikett wurde mit 28 % Zuversicht in 4,1 s
- * gelesen, der Adressblock allein mit 62 % in 0,5 s – und nur im zweiten Fall
- * standen brauchbare Angaben im Ergebnis. Höhere Auflösung half nicht, der
- * Ausschnitt half achtfach. Deshalb steht zwischen Aufnahme und Erkennung ein
- * Rahmen, den die erfassende Person auf das Anschriftenfeld zieht.
+ * gelesen, der Adressblock allein mit 62 % in 0,5 s. Höhere Auflösung half
+ * nicht, der Ausschnitt half achtfach.
+ *
+ * Deshalb markiert die erfassende Person die Bereiche selbst und sagt durch die
+ * Wahl der Seite, **was** dort steht. Damit entfällt das Raten der Zuordnung
+ * vollständig: die Erkennung muss nur noch lesen, nicht mehr deuten. Jeder
+ * Bereich wird einzeln erkannt – klein, schnell, sicher.
  * ------------------------------------------------------------------ */
+
+const SEITEN = ['empfaenger', 'absender'];
 
 const zuschnitt = {
   blob: null,
   ziel: 'umschlag',
-  rahmen: { x: 0.06, y: 0.2, w: 0.88, h: 0.5 },
+  rolle: 'empfaenger',
+  bereiche: { empfaenger: null, absender: null },
   zug: null,
 };
 
-const MINDESTANTEIL = 0.1;
+const MINDESTANTEIL = 0.08;
+const VORGABEHOEHE = 0.28;
 
 function begrenze(wert, min, max) {
   return Math.max(min, Math.min(max, wert));
 }
 
-/** Zeigt das aufgenommene Bild mit dem Rahmen darüber. */
+/** Zeigt das aufgenommene Bild zum Markieren. */
 async function zeigeZuschnitt(file, ziel) {
   const bereich = $('zuschnitt');
   try {
@@ -597,103 +604,195 @@ async function zeigeZuschnitt(file, ziel) {
     leinwand.height = Math.max(1, Math.round(bild.naturalHeight * faktor));
     leinwand.getContext('2d').drawImage(bild, 0, 0, leinwand.width, leinwand.height);
   } catch (error) {
-    // Lässt sich das Bild nicht anzeigen, wird ohne Zuschnitt erkannt.
+    // Lässt sich das Bild nicht anzeigen, wird ohne Markierung erkannt.
     await runOcr(file, ziel);
     return;
   }
   zuschnitt.blob = file;
   zuschnitt.ziel = ziel;
-  zuschnitt.rahmen = { x: 0.06, y: 0.2, w: 0.88, h: 0.5 };
-  zeichneRahmen();
+  zuschnitt.bereiche = { empfaenger: null, absender: null };
+  zuschnitt.zug = null;
+  // Ein Bild, das für eine Seite aufgenommen wurde, kennt nur diese Seite.
+  zuschnitt.rolle = ziel === 'umschlag' ? 'empfaenger' : ziel;
+  $('zuschnitt-rollen').hidden = ziel !== 'umschlag';
+  waehleRolle(zuschnitt.rolle);
+  zeichneBereiche();
   bereich.hidden = false;
-  $('ocr-status').textContent =
-    `Rahmen auf das Anschriftenfeld ziehen (${ZIELWORT[ziel]}), dann „Bereich erkennen“.`;
   bereich.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
-function zeichneRahmen() {
-  const rahmen = $('zuschnitt-rahmen');
-  const { x, y, w, h } = zuschnitt.rahmen;
-  rahmen.style.left = `${x * 100}%`;
-  rahmen.style.top = `${y * 100}%`;
-  rahmen.style.width = `${w * 100}%`;
-  rahmen.style.height = `${h * 100}%`;
+function waehleRolle(rolle) {
+  zuschnitt.rolle = rolle;
+  for (const knopf of document.querySelectorAll('[data-rolle]')) {
+    knopf.classList.toggle('is-active', knopf.dataset.rolle === rolle);
+  }
+  zeichneBereiche();
+}
+
+/** Zeichnet die markierten Bereiche und schreibt den Stand darunter. */
+function zeichneBereiche() {
+  const buehne = document.querySelector('.zuschnitt__buehne');
+  for (const seite of SEITEN) {
+    const flaeche = zuschnitt.bereiche[seite];
+    let kasten = buehne.querySelector(`[data-bereich="${seite}"]`);
+    if (!flaeche) {
+      kasten?.remove();
+      continue;
+    }
+    if (!kasten) {
+      kasten = el('div', { class: `rahmen rahmen--${seite}`, 'data-bereich': seite }, [
+        el('span', { class: 'rahmen__marke', text: ZIELWORT[seite] }),
+        ...['nw', 'ne', 'sw', 'se'].map((griff) =>
+          el('span', { class: `rahmen__griff rahmen__griff--${griff}`, 'data-griff': griff }),
+        ),
+      ]);
+      buehne.append(kasten);
+    }
+    kasten.style.left = `${flaeche.x * 100}%`;
+    kasten.style.top = `${flaeche.y * 100}%`;
+    kasten.style.width = `${flaeche.w * 100}%`;
+    kasten.style.height = `${flaeche.h * 100}%`;
+    kasten.classList.toggle('rahmen--aktiv', seite === zuschnitt.rolle);
+  }
+
+  const markiert = SEITEN.filter((seite) => zuschnitt.bereiche[seite]);
+  const fehlt = SEITEN.filter((seite) => !zuschnitt.bereiche[seite]);
+  const nurEine = zuschnitt.ziel !== 'umschlag';
+  $('zuschnitt-stand').textContent = markiert.length
+    ? `Markiert: ${markiert.map((s) => ZIELWORT[s]).join(' und ')}.` +
+      (nurEine || !fehlt.length
+        ? ''
+        : ` ${fehlt.map((s) => ZIELWORT[s]).join(' und ')} fehlt noch – oder ohne erkennen.`)
+    : 'Noch nichts markiert: ein Rechteck über die Anschrift ziehen.';
+  $('zuschnitt-erkennen').disabled = !markiert.length;
 }
 
 function beendeZuschnitt() {
   $('zuschnitt').hidden = true;
   zuschnitt.blob = null;
   zuschnitt.zug = null;
+  zuschnitt.bereiche = { empfaenger: null, absender: null };
+  zeichneBereiche();
 }
 
-/** Verschieben und Ziehen des Rahmens, mit Maus wie mit dem Finger. */
+/** Markieren, Verschieben und Ziehen – mit Maus wie mit dem Finger. */
 function wireZuschnitt() {
   const buehne = document.querySelector('.zuschnitt__buehne');
-  const rahmen = $('zuschnitt-rahmen');
 
   const anteil = (event) => {
     const box = buehne.getBoundingClientRect();
-    return { x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height };
+    return {
+      x: begrenze((event.clientX - box.left) / box.width, 0, 1),
+      y: begrenze((event.clientY - box.top) / box.height, 0, 1),
+    };
   };
 
-  const start = (event) => {
+  buehne.addEventListener('pointerdown', (event) => {
+    if (!zuschnitt.blob) return;
+    const punkt = anteil(event);
+    const kasten = event.target.closest?.('[data-bereich]');
     const griff = event.target.dataset?.griff;
-    zuschnitt.zug = { griff: griff || 'move', punkt: anteil(event), rahmen: { ...zuschnitt.rahmen } };
-    event.target.setPointerCapture?.(event.pointerId);
+    if (kasten && griff) {
+      zuschnitt.zug = {
+        art: 'griff', griff, seite: kasten.dataset.bereich, punkt,
+        rahmen: { ...zuschnitt.bereiche[kasten.dataset.bereich] },
+      };
+    } else if (kasten) {
+      zuschnitt.zug = {
+        art: 'verschieben', seite: kasten.dataset.bereich, punkt,
+        rahmen: { ...zuschnitt.bereiche[kasten.dataset.bereich] },
+      };
+      waehleRolle(kasten.dataset.bereich);
+    } else {
+      // Auf freier Fläche beginnt ein neuer Bereich für die gewählte Seite.
+      zuschnitt.zug = { art: 'neu', seite: zuschnitt.rolle, punkt, rahmen: null };
+      zuschnitt.bereiche[zuschnitt.rolle] = { x: punkt.x, y: punkt.y, w: 0, h: 0 };
+    }
+    buehne.setPointerCapture?.(event.pointerId);
     event.preventDefault();
-  };
-
-  rahmen.addEventListener('pointerdown', start);
+  });
 
   const bewege = (event) => {
     const zug = zuschnitt.zug;
     if (!zug) return;
     const jetzt = anteil(event);
-    const dx = jetzt.x - zug.punkt.x;
-    const dy = jetzt.y - zug.punkt.y;
-    const alt = zug.rahmen;
-    if (zug.griff === 'move') {
-      zuschnitt.rahmen = {
-        ...alt,
-        x: begrenze(alt.x + dx, 0, 1 - alt.w),
-        y: begrenze(alt.y + dy, 0, 1 - alt.h),
+    if (zug.art === 'neu') {
+      zuschnitt.bereiche[zug.seite] = {
+        x: Math.min(zug.punkt.x, jetzt.x),
+        y: Math.min(zug.punkt.y, jetzt.y),
+        w: Math.abs(jetzt.x - zug.punkt.x),
+        h: Math.abs(jetzt.y - zug.punkt.y),
       };
     } else {
-      const links = zug.griff.includes('w');
-      const oben = zug.griff.includes('n');
-      let { x, y, w, h } = alt;
-      if (links) {
-        const neu = begrenze(alt.x + dx, 0, alt.x + alt.w - MINDESTANTEIL);
-        w = alt.x + alt.w - neu;
-        x = neu;
+      const alt = zug.rahmen;
+      const dx = jetzt.x - zug.punkt.x;
+      const dy = jetzt.y - zug.punkt.y;
+      if (zug.art === 'verschieben') {
+        zuschnitt.bereiche[zug.seite] = {
+          ...alt,
+          x: begrenze(alt.x + dx, 0, 1 - alt.w),
+          y: begrenze(alt.y + dy, 0, 1 - alt.h),
+        };
       } else {
-        w = begrenze(alt.w + dx, MINDESTANTEIL, 1 - alt.x);
+        let { x, y, w, h } = alt;
+        if (zug.griff.includes('w')) {
+          const kante = begrenze(alt.x + dx, 0, alt.x + alt.w - MINDESTANTEIL);
+          w = alt.x + alt.w - kante;
+          x = kante;
+        } else {
+          w = begrenze(alt.w + dx, MINDESTANTEIL, 1 - alt.x);
+        }
+        if (zug.griff.includes('n')) {
+          const kante = begrenze(alt.y + dy, 0, alt.y + alt.h - MINDESTANTEIL);
+          h = alt.y + alt.h - kante;
+          y = kante;
+        } else {
+          h = begrenze(alt.h + dy, MINDESTANTEIL, 1 - alt.y);
+        }
+        zuschnitt.bereiche[zug.seite] = { x, y, w, h };
       }
-      if (oben) {
-        const neu = begrenze(alt.y + dy, 0, alt.y + alt.h - MINDESTANTEIL);
-        h = alt.y + alt.h - neu;
-        y = neu;
-      } else {
-        h = begrenze(alt.h + dy, MINDESTANTEIL, 1 - alt.y);
-      }
-      zuschnitt.rahmen = { x, y, w, h };
     }
-    zeichneRahmen();
+    zeichneBereiche();
     event.preventDefault();
   };
 
-  const ende = () => { zuschnitt.zug = null; };
-  for (const ziel of [rahmen, window]) {
+  const ende = () => {
+    const zug = zuschnitt.zug;
+    zuschnitt.zug = null;
+    if (!zug) return;
+    // Ein Antippen statt eines Zugs: ein Bereich in Vorgabegröße um den Punkt.
+    const flaeche = zuschnitt.bereiche[zug.seite];
+    if (flaeche && (flaeche.w < MINDESTANTEIL || flaeche.h < MINDESTANTEIL)) {
+      const breite = 0.86;
+      zuschnitt.bereiche[zug.seite] = {
+        x: begrenze(zug.punkt.x - breite / 2, 0, 1 - breite),
+        y: begrenze(zug.punkt.y - VORGABEHOEHE / 2, 0, 1 - VORGABEHOEHE),
+        w: breite,
+        h: VORGABEHOEHE,
+      };
+    }
+    zeichneBereiche();
+  };
+
+  for (const ziel of [buehne, window]) {
     ziel.addEventListener('pointermove', bewege);
     ziel.addEventListener('pointerup', ende);
     ziel.addEventListener('pointercancel', ende);
   }
 
+  for (const knopf of document.querySelectorAll('[data-rolle]')) {
+    knopf.addEventListener('click', () => waehleRolle(knopf.dataset.rolle));
+  }
+
   $('zuschnitt-erkennen').addEventListener('click', async () => {
-    const { blob, ziel, rahmen: ausschnitt } = zuschnitt;
-    if (!blob) return;
+    const aufgabe = SEITEN.filter((seite) => zuschnitt.bereiche[seite]).map((seite) => ({
+      seite,
+      flaeche: zuschnitt.bereiche[seite],
+    }));
+    const blob = zuschnitt.blob;
+    if (!blob || !aufgabe.length) return;
     beendeZuschnitt();
-    await runOcr(blob, ziel, ausschnitt);
+    await erkenneBereiche(blob, aufgabe);
   });
   $('zuschnitt-ganz').addEventListener('click', async () => {
     const { blob, ziel } = zuschnitt;
@@ -705,6 +804,59 @@ function wireZuschnitt() {
     beendeZuschnitt();
     $('ocr-status').textContent = 'Abgebrochen. Die Felder lassen sich von Hand ausfüllen.';
   });
+}
+
+/**
+ * Erkennt die markierten Bereiche, einen nach dem anderen.
+ *
+ * Die Seite steht fest – die erfassende Person hat sie benannt. Deshalb wird
+ * hier nicht nach Empfänger und Absender gesucht, sondern nur eine Anschrift
+ * zerlegt. Beschriftungen, die mit im Rechteck lagen, werden vorher entfernt.
+ */
+async function erkenneBereiche(blob, aufgabe) {
+  const status = $('ocr-status');
+  const rohtexte = [];
+  const meldungen = [];
+  const anmerkungen = [];
+
+  for (const [nummer, { seite, flaeche }] of aufgabe.entries()) {
+    status.textContent =
+      `Erkennung läuft (${ZIELWORT[seite]}${aufgabe.length > 1 ? `, ${nummer + 1} von ${aufgabe.length}` : ''}) …`;
+    const begonnen = Date.now();
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await recogniseText(blob, { crop: flaeche });
+      if (!result) {
+        status.textContent =
+          'Keine lokale Texterkennung verfügbar. Bitte die Felder von Hand ausfüllen.';
+        return;
+      }
+      const parsed = parseAddress(ohneAnkerbeschriftung(result.text));
+      rohtexte.push(`— ${ZIELWORT[seite]} —\n${result.text || '(kein Text erkannt)'}`);
+      anmerkungen.push(
+        `${ZIELWORT[seite]}: ${result.durationMs} ms · Zuversicht ${(result.confidence * 100).toFixed(0)} %` +
+          (parsed.notes.length ? ` · ${parsed.notes.join(' ')}` : ''),
+      );
+      const dauer = `${((Date.now() - begonnen) / 1000).toFixed(1)} s`;
+      if (istBrauchbar(parsed, result, true)) {
+        fuelleSeite(seite, parsed);
+        if (parsed.shipmentType && !$('art').value) $('art').value = parsed.shipmentType;
+        state.dirty = true;
+        meldungen.push(`${ZIELWORT[seite]}: übernommen (${dauer}).`);
+      } else {
+        meldungen.push(`${ZIELWORT[seite]}: nichts Sicheres gelesen (${dauer}) – bitte tippen.`);
+      }
+      state.form.ocr = { ...result, parsed };
+    } catch (error) {
+      meldungen.push(`${ZIELWORT[seite]}: Erkennung fehlgeschlagen (${error.message}).`);
+    }
+  }
+
+  $('ocr-text').textContent = rohtexte.join('\n\n');
+  $('ocr-herkunft').textContent = anmerkungen.join(' | ');
+  $('ocr-ergebnis').hidden = false;
+  $('ocr-ergebnis').open = true;
+  status.textContent = `${meldungen.join(' ')} Bitte prüfen und bei Bedarf berichtigen.`;
 }
 
 async function runOcr(file, ziel = 'umschlag', crop = null) {
@@ -770,10 +922,14 @@ const ERKENNUNGSSCHWELLE = 0.55;
  * Anschrift ergibt: Postleitzahl und dazu Straße, Organisation oder Name.
  * Nichts einzutragen ist besser als etwas Falsches einzutragen.
  */
-function istBrauchbar(teil, erkennung) {
+function istBrauchbar(teil, erkennung, markiert = false) {
   if (!teil) return false;
   if (!teil.address) return false;
   if (erkennung.confidence >= ERKENNUNGSSCHWELLE) return true;
+  // Ein markierter Bereich ist eine Aussage: „hier steht die Anschrift“. Dann
+  // genügt ein Anker – Postleitzahl oder Straße –, um zu übernehmen. Ohne
+  // Markierung muss das Ergebnis für sich eine Anschrift ergeben.
+  if (markiert) return Boolean(teil.postalCode || teil.street);
   return Boolean(teil.postalCode && (teil.street || teil.organisation || teil.person));
 }
 

@@ -468,3 +468,23 @@ export function parseAddress(text) {
 export function label(parsed) {
   return [parsed.organisation, parsed.person].filter(Boolean).join(' · ');
 }
+
+/**
+ * Entfernt Beschriftungen wie „Empfänger:“ aus dem Text.
+ *
+ * Wird ein Bereich von Hand markiert, liegt die Beschriftung oft mit im
+ * Rechteck. Die Seite ist dann schon bekannt; das Wort selbst gehört in kein
+ * Feld. Steht hinter der Beschriftung noch etwas, bleibt dieser Rest erhalten.
+ */
+export function ohneAnkerbeschriftung(text) {
+  return tidy(text)
+    .map((zeile) => {
+      for (const anker of ANKER) {
+        const treffer = zeile.match(anker.muster);
+        if (treffer) return (treffer[1] || '').trim();
+      }
+      return zeile;
+    })
+    .filter(Boolean)
+    .join('\n');
+}

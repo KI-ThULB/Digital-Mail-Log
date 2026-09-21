@@ -1,6 +1,6 @@
 # Teststatus
 
-Stand 18.09.2026.
+Stand 21.09.2026.
 
 ## Ergebnis
 
@@ -9,9 +9,9 @@ Stand 18.09.2026.
 | Fachkern (`tests/test_domain.py`) | 38 | bestanden |
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
-| Adressparser und Portokorpus (`tests/js/`) | 24 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 8 | bestanden |
-| **Summe** | **114** | **bestanden** |
+| Adressparser und Portokorpus (`tests/js/`) | 26 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 9 | bestanden |
+| **Summe** | **117** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -77,9 +77,12 @@ mit Begründung, Entstehen der zweiten Fassung, Portosumme in der Liste,
 Abweisung eines ungültigen Portobetrags. Auf einem Ansichtsfenster in
 Telefongröße, ohne Fehler in der Browserkonsole.
 
-**Zuschnitt.** Der Rahmen lässt sich mit dem Zeiger an den Griffen über das
-ganze Bild aufziehen; erkannt wird der Ausschnitt. Im Browser nachgewiesen, samt
-der Umrechnung von Anteilen in Bildpunkte.
+**Markierte Bereiche.** Am erzeugten Etikettenbild im Browser: Absender- und
+Empfängerbereich werden mit dem Zeiger gezogen, in beliebiger Reihenfolge, und
+jeder Bereich einzeln erkannt. Die Angaben landen auf der Seite, die markiert
+wurde — nicht auf der anderen —, mitmarkierte Beschriftungen („Empfänger:“)
+landen in keinem Feld, und der Statustext benennt jede Seite einzeln. Geprüft ist
+damit auch die Umrechnung von Anteilen in Bildpunkte.
 
 **Texterkennung, örtlich.** Auf einem erzeugten Prüfumschlag: Tesseract mit
 deutschen Sprachdaten, vollständig im Browser, **1,4 Sekunden**, Zuversicht 90 %.
@@ -98,9 +101,10 @@ Bauumgebung beurteilen:
   Handschrift sind etwas anderes. An einem einzelnen echten Paketetikett gemessen:
   ganzes Etikett 28 % Zuversicht in 4144 ms, nur der Adressblock 62 % in 469 ms.
   Ein Etikett ist keine Messreihe; der Pilotbetrieb muss das prüfen.
-* **Der Zuschnitt in der Hand der Poststelle.** Dass der Rahmen am Telefon
-  schnell genug sitzt, ist am Gerät zu beurteilen, nicht im Browser auf einem
-  Entwicklungsrechner.
+* **Das Markieren in der Hand der Poststelle.** Ob zwei Wischbewegungen je
+  Sendung am Telefon schnell genug sitzen, ist am Gerät zu beurteilen, nicht im
+  Browser auf einem Entwicklungsrechner. Im Test mit dem Zeiger gezogen — der
+  Daumen auf Glas ist etwas anderes.
 * **Dauer auf den tatsächlichen Geräten.** 1,4 Sekunden auf einem
   Entwicklungsrechner sagen nichts über ein vier Jahre altes iPad.
 * **Kamera, Akku, Erwärmung** über einen Vormittag.

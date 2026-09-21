@@ -27,13 +27,20 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
    welche Felder erscheinen.
 2. **Umschlag fotografieren.** Die Kamera geht auf, Sie halten die Sendung so,
    dass das ganze Anschriftenfeld das Bild füllt.
-3. **Rahmen auf die Anschrift ziehen**, dann **„Bereich erkennen“**. Der Rahmen
-   lässt sich verschieben und an den vier Punkten aufziehen. Je enger er sitzt,
-   desto schneller und sicherer das Ergebnis – bei einem Paketetikett ist das der
-   größte Unterschied überhaupt. Passt das ganze Bild, genügt **„Ganzes Bild“**.
-   Nach ein bis drei Sekunden erscheinen Vorschläge: der große Adressblock wird
-   als **Empfänger** übernommen, eine kleine Absenderzeile darüber als
-   **Absender**. Steht auf der Sendung ausdrücklich „Empfänger“ oder „Absender“
+3. **Bereiche markieren.** Oben die Seite wählen — **„Empfänger markieren“**
+   oder **„Absender markieren“** —, dann mit dem Finger ein Rechteck über die
+   Anschrift ziehen. Ein einfacher Tipp setzt einen Rahmen in Standardgröße; er
+   lässt sich verschieben und an den farbigen Punkten anpassen. Markieren Sie
+   beides, wenn beides auf der Sendung steht; sonst genügt eine Seite.
+   Dann **„Markiertes erkennen“**.
+
+   **Damit entscheiden Sie über die Zuordnung, nicht die Maschine.** Das ist der
+   Grund für diesen Handgriff: die App muss dann nur noch lesen. Kleine Bereiche
+   liest sie außerdem deutlich schneller und sicherer als ein ganzes Etikett.
+
+   Bei einem sauberen Fensterumschlag geht es auch ohne: **„Ganzes Bild“**
+   übernimmt den großen Adressblock als Empfänger und eine kleine Zeile darüber
+   als Absender. Steht auf der Sendung ausdrücklich „Empfänger“ oder „Absender“
    — wie auf Paketetiketten —, gilt diese Beschriftung.
 4. **Eigene Stelle antippen.** Über den Feldern der eigenen Seite stehen die
    gemerkten Stellen des Hauses. Ein Tipp füllt Name, Organisation, Anschrift und
@@ -64,8 +71,8 @@ glaubt. Bei Knick, Stempel, schlechtem Licht oder Handschrift liegt sie daneben.
 Was Sie speichern, ist Ihre Angabe — nicht die der Maschine.
 
 **Lieber leer als falsch.** War die Erkennung unsicher, füllt sie kein Feld und
-sagt es: „nichts Sicheres gefunden“. Dann bitte näher heran und den Rahmen enger
-ziehen, oder tippen. Das ist Absicht — ein Feld voller Unsinn kostet mehr Zeit
+sagt es: „nichts Sicheres gelesen“. Dann bitte näher heran und den Bereich enger
+markieren, oder tippen. Das ist Absicht — ein Feld voller Unsinn kostet mehr Zeit
 als ein leeres.
 
 **Porto: leer und 0,00 € sind nicht dasselbe.** Leer heißt „nicht bekannt“.
@@ -109,7 +116,7 @@ schief angesehen; das Verfahren ist genau dafür gebaut.
 | Was Sie sehen | Was zu tun ist |
 |---|---|
 | „Keine lokale Texterkennung“ | Von Hand erfassen, weitermachen. Bitte melden. |
-| „nichts Sicheres gefunden“ | Rahmen enger auf die Anschrift ziehen und erneut erkennen. Hilft das nicht: von Hand erfassen. |
+| „nichts Sicheres gelesen“ | Bereich enger um die Anschrift markieren und erneut erkennen. Hilft das nicht: von Hand erfassen. |
 | Kamera geht nicht auf | App schließen und neu öffnen. Hilft das nicht: melden, von Hand erfassen. |
 | „Eintrag wurde zwischenzeitlich geändert“ | Jemand anderes hat denselben Eintrag bearbeitet. Zurück, neu laden, Änderung noch einmal machen. |
 | Warteschlange wird nicht leer | Melden. Die erfassten Sendungen sind nicht verloren, sie liegen auf dem Gerät. |

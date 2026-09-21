@@ -322,25 +322,51 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--gruen); 
 }
 .zuschnitt__bild { display: block; max-width: 100%; height: auto; }
 
+.rollen { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.rolle { border: 1px solid var(--linie); background: transparent; }
+.rolle.is-active {
+  border-color: transparent;
+  background: var(--gruen);
+  color: #fff;
+  font-weight: 600;
+}
+@media (prefers-color-scheme: dark) { .rolle.is-active { color: #06100f; } }
+
 .rahmen {
   position: absolute;
-  border: 2px solid var(--gruen-hell, #7fd1c1);
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  border: 3px solid #f0a800;
   cursor: move;
 }
+.rahmen--empfaenger { border-color: #0f8f7a; }
+.rahmen--absender { border-color: #b05a00; }
+.rahmen--aktiv { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7); }
+.rahmen__marke {
+  position: absolute;
+  left: 0;
+  top: -1.6em;
+  padding: 1px 8px;
+  border-radius: 6px 6px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+}
+.rahmen--empfaenger > .rahmen__marke { background-color: #0f8f7a; }
+.rahmen--absender > .rahmen__marke { background-color: #b05a00; }
 .rahmen__griff {
   position: absolute;
-  width: 34px;
-  height: 34px;
-  background: var(--gruen-hell, #7fd1c1);
+  width: 28px;
+  height: 28px;
   border: 2px solid #fff;
   border-radius: 50%;
   touch-action: none;
 }
-.rahmen__griff--nw { left: -17px; top: -17px; cursor: nwse-resize; }
-.rahmen__griff--ne { right: -17px; top: -17px; cursor: nesw-resize; }
-.rahmen__griff--sw { left: -17px; bottom: -17px; cursor: nesw-resize; }
-.rahmen__griff--se { right: -17px; bottom: -17px; cursor: nwse-resize; }
+.rahmen--empfaenger > .rahmen__griff { background: #0f8f7a; }
+.rahmen--absender > .rahmen__griff { background: #b05a00; }
+.rahmen__griff--nw { left: -14px; top: -14px; cursor: nwse-resize; }
+.rahmen__griff--ne { right: -14px; top: -14px; cursor: nesw-resize; }
+.rahmen__griff--sw { left: -14px; bottom: -14px; cursor: nesw-resize; }
+.rahmen__griff--se { right: -14px; bottom: -14px; cursor: nwse-resize; }
 .zuschnitt__aktionen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
 .ocr-text {

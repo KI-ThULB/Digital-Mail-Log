@@ -130,8 +130,28 @@ def _schnittstellen() -> list[tuple[str, str]]:
     return []
 
 
-def _einordnung(name: str) -> str:
-    """Sagt in einem Halbsatz, wofür eine Adresse taugt."""
+def _einordnung(name: str, adresse: str = "") -> str:
+    """Sagt in einem Halbsatz, wofür eine Adresse taugt.
+
+    Die Adresse wird zuerst betrachtet, denn zwei Bereiche sind Sackgassen, die
+    aussehen wie ein gewöhnliches Netz:
+
+    ``192.0.0.0/29`` vergibt macOS sich selbst, wenn das Netz nur IPv6 spricht
+    (464XLAT). Das kommt im Hotspot eines Telefons vor, dessen Mobilfunknetz
+    IPv6-only ist. Die Adresse ist eine Übersetzungsadresse des eigenen Rechners
+    – kein anderes Gerät erreicht sie, auch nicht das Telefon, das den Hotspot
+    aufspannt. Abhilfe: im iPhone „Maximale Kompatibilität“ einschalten, dann
+    vergibt der Hotspot wieder IPv4 (172.20.10.x).
+
+    ``169.254.0.0/16`` heißt, dass die Netzkonfiguration fehlgeschlagen ist.
+    """
+    if adresse.startswith("192.0.0."):
+        return (
+            "IPv6-Hotspot (464XLAT) – vom Telefon NICHT erreichbar; "
+            "im iPhone „Maximale Kompatibilität“ einschalten"
+        )
+    if adresse.startswith("169.254."):
+        return "ohne Netzkonfiguration – keine Verbindung zustande gekommen"
     if name.startswith(_TUNNEL):
         return "VPN oder Tunnel – vom Telefon aus nicht erreichbar"
     if name.startswith(_FUNK):
@@ -161,7 +181,7 @@ def _local_addresses(port: int) -> list[str]:
     for name, adresse in sorted(
         schnittstellen, key=lambda e: (not e[0].startswith(_FUNK), e[0], e[1])
     ):
-        beschriftung = f" ({name}, {_einordnung(name)})" if name else ""
+        beschriftung = f" ({name}, {_einordnung(name, adresse)})" if name else ""
         zeilen.append(f"http://{adresse}:{port}/{beschriftung}")
     return zeilen
 

@@ -53,6 +53,20 @@ class Schnittstellen(unittest.TestCase):
         self.assertEqual(schnittstellen_aus_text(""), [])
         self.assertEqual(schnittstellen_aus_text("kein Netz\nirgendwas"), [])
 
+    def test_sackgassen_werden_als_solche_benannt(self):
+        """Zwei Adressbereiche sehen aus wie ein Netz und sind keines.
+
+        192.0.0.2 vergibt macOS sich selbst, wenn der Hotspot nur IPv6 spricht.
+        Die Adresse steht in `ifconfig` wie jede andere, ist aber von außen
+        unerreichbar — im Test genau die verlorene halbe Stunde.
+        """
+        hotspot = _einordnung("en0", "192.0.0.2")
+        self.assertIn("NICHT erreichbar", hotspot)
+        self.assertIn("Maximale Kompatibilität", hotspot)
+        self.assertIn("ohne Netzkonfiguration", _einordnung("en1", "169.254.12.7"))
+        # Eine gewöhnliche Adresse bleibt davon unberührt.
+        self.assertIn("lokales Netz", _einordnung("en0", "172.20.10.2"))
+
     def test_einordnung_benennt_tunnel_und_lokales_netz(self):
         self.assertIn("VPN", _einordnung("utun4"))
         self.assertIn("VPN", _einordnung("wg0"))

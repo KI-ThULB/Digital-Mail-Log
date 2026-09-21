@@ -9,10 +9,10 @@ Stand 21.09.2026.
 | Fachkern (`tests/test_domain.py`) | 38 | bestanden |
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
-| Entwicklungsserver (`tests/test_server.py`) | 5 | bestanden |
+| Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
 | Adressparser und Portokorpus (`tests/js/`) | 26 | bestanden |
 | Oberfläche im Browser (`tests/test_oberflaeche.py`) | 9 | bestanden |
-| **Summe** | **122** | **bestanden** |
+| **Summe** | **123** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -57,9 +57,11 @@ Jena bereits der Folgetag; der Test hält genau diesen Fall fest.
 
 **Adressauskunft des Entwicklungsservers.** Aus `ifconfig` (macOS) und
 `ip -4 -o addr` (Linux) werden alle IPv4-Adressen samt Schnittstellennamen
-gelesen und beschriftet: lokales Netz oder Tunnel. Anlass war ein verlorener
-Testlauf — bei aktivem VPN nannte der Server nur die Tunneladresse, und die ist
-vom Telefon im WLAN nicht erreichbar.
+gelesen und beschriftet: lokales Netz, Tunnel oder Sackgasse. Anlass waren zwei
+verlorene Testläufe — bei aktivem VPN nannte der Server nur die Tunneladresse,
+und im Hotspot eines IPv6-only-Mobilfunknetzes trug der Rechner die
+Übersetzungsadresse 192.0.0.2, die kein anderes Gerät erreicht. Beides sieht in
+`ifconfig` aus wie ein gewöhnliches Netz und wird jetzt benannt.
 
 **Rechte.** Lesende Rollen können nicht schreiben, erfassende nicht verwalten.
 Ohne Benutzerkennung vom vorgelagerten Webserver antwortet die Schnittstelle mit

@@ -588,7 +588,13 @@ const zuschnitt = {
   zug: null,
 };
 
-const MINDESTANTEIL = 0.08;
+// Kleinste Kante, auf die sich ein Rahmen an den Griffen ziehen lässt. Klein
+// genug für einen quer gedruckten Absender am Rand: der ist ein schmaler
+// Streifen, oft keine drei Prozent der Bildbreite.
+const MINDESTANTEIL = 0.03;
+// Darunter war es kein Zug, sondern ein Tippen – dann wird ein Rahmen in
+// Vorgabegröße gesetzt.
+const TIPPSCHWELLE = 0.02;
 const VORGABEHOEHE = 0.28;
 
 function begrenze(wert, min, max) {
@@ -795,14 +801,28 @@ function wireZuschnitt() {
     zuschnitt.zug = null;
     if (!zug) return;
     // Ein Antippen statt eines Zugs: ein Bereich in Vorgabegröße um den Punkt.
+    //
+    // Geprüft werden **beide** Kanten. Vorher genügte eine: ein schmal
+    // gezogener Streifen – genau die Form eines quer gedruckten Absenders –
+    // wurde dadurch als Tippen gewertet und durch den großen Vorgaberahmen
+    // ersetzt. Die Erkennung las dann den halben Umschlag statt des Namens.
     const flaeche = zuschnitt.bereiche[zug.seite];
-    if (flaeche && (flaeche.w < MINDESTANTEIL || flaeche.h < MINDESTANTEIL)) {
+    if (flaeche && flaeche.w < TIPPSCHWELLE && flaeche.h < TIPPSCHWELLE) {
       const breite = 0.86;
       zuschnitt.bereiche[zug.seite] = {
         x: begrenze(zug.punkt.x - breite / 2, 0, 1 - breite),
         y: begrenze(zug.punkt.y - VORGABEHOEHE / 2, 0, 1 - VORGABEHOEHE),
         w: breite,
         h: VORGABEHOEHE,
+      };
+    }
+    // Ein bewusst gezogener, aber sehr schmaler Streifen bleibt erhalten und
+    // bekommt nur eine Mindestkante, damit er greifbar bleibt.
+    else if (flaeche) {
+      zuschnitt.bereiche[zug.seite] = {
+        ...flaeche,
+        w: Math.max(flaeche.w, MINDESTANTEIL),
+        h: Math.max(flaeche.h, MINDESTANTEIL),
       };
     }
     zeichneBereiche();
@@ -848,6 +868,32 @@ function wireZuschnitt() {
  * hier nicht nach Empfänger und Absender gesucht, sondern nur eine Anschrift
  * zerlegt. Beschriftungen, die mit im Rechteck lagen, werden vorher entfernt.
  */
+/**
+ * Legt einen Sicherheitsrand um einen markierten Bereich.
+ *
+ * Gemessen an einem echten Umschlag: derselbe Absender, einmal großzügig
+ * markiert (76 % Zuversicht, „Kulturrat Thüringen e.V.“) und einmal um einen
+ * Fingerbreit zu eng (Ergebnis: „EN A“). Ein um ein Prozent zu schmaler Rahmen
+ * schneidet die Buchstaben längs an, und angeschnittene Buchstaben sind für die
+ * Erkennung schlimmer als gar keine.
+ *
+ * Der Rand ist anteilig, aber mit Untergrenze: ein schmaler Streifen – etwa ein
+ * quer gedruckter Absender am Rand – braucht absolut mehr Luft, als vier
+ * Prozent seiner eigenen Breite ergäben.
+ */
+function mitRand(flaeche, anteil = 0.06, mindestens = 0.015) {
+  const randX = Math.max(flaeche.w * anteil, mindestens);
+  const randY = Math.max(flaeche.h * anteil, mindestens);
+  const x = begrenze(flaeche.x - randX, 0, 1);
+  const y = begrenze(flaeche.y - randY, 0, 1);
+  return {
+    x,
+    y,
+    w: Math.min(flaeche.w + 2 * randX, 1 - x),
+    h: Math.min(flaeche.h + 2 * randY, 1 - y),
+  };
+}
+
 /** Trägt das Ergebnis genug, um es nicht noch einmal zu versuchen? */
 function taugt(result, parsed) {
   return Boolean(result && result.confidence >= 0.6 && (parsed.postalCode || parsed.street));
@@ -909,7 +955,7 @@ async function erkenneBereiche(blob, aufgabe, drehung = 0) {
     const begonnen = Date.now();
     try {
       // eslint-disable-next-line no-await-in-loop
-      const gelesen = await erkenneMitDrehung(blob, flaeche, drehung, richtung);
+      const gelesen = await erkenneMitDrehung(blob, mitRand(flaeche), drehung, richtung);
       if (!gelesen) {
         status.textContent =
           'Keine lokale Texterkennung verfügbar. Bitte die Felder von Hand ausfüllen.';
@@ -934,7 +980,10 @@ async function erkenneBereiche(blob, aufgabe, drehung = 0) {
             `${gelesen.drehung ? `, um ${gelesen.drehung}° gedreht` : ''}).`,
         );
       } else {
-        meldungen.push(`${ZIELWORT[seite]}: nichts Sicheres gelesen (${dauer}) – bitte tippen.`);
+        meldungen.push(
+          `${ZIELWORT[seite]}: nichts Sicheres gelesen (${dauer}) – bitte den Bereich ` +
+            'großzügiger markieren oder von Hand ausfüllen.',
+        );
       }
       state.form.ocr = { ...result, parsed };
     } catch (error) {

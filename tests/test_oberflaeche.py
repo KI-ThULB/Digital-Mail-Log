@@ -497,6 +497,42 @@ class BrowserFlow(unittest.TestCase):
             self.assertIn("Empfänger:", status)
             self.assertIn("Absender:", status)
 
+    def test_schmaler_streifen_bleibt_ein_streifen(self):
+        """Ein quer gedruckter Absender am Rand ist ein schmaler Streifen.
+
+        Er wurde als Antippen gewertet und durch den großen Vorgaberahmen
+        ersetzt — die Erkennung las dann den halben Umschlag statt des Namens.
+        Am echten Umschlag gemessen: derselbe Absender einmal 18 % Zuversicht
+        („EN A“), nach der Berichtigung 94 % („Kulturrat Thüringen e.V.“).
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            image = _parcel_label_png(Path(folder) / "etikett.png")
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.set_input_files("#foto-erkennung", str(image))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+
+            # Vier Prozent breit, dreißig Prozent hoch: bewusst gezogen.
+            self._markiere("empfaenger", 0.30, 0.20, 0.34, 0.50)
+            breite = page.evaluate(
+                "() => document.querySelector('[data-bereich=\"empfaenger\"]').style.width"
+            )
+            self.assertLess(
+                float(breite.rstrip("%")), 10, "Der gezogene Streifen darf nicht aufgeblasen werden"
+            )
+
+            # Ein echtes Antippen dagegen setzt weiterhin einen Vorgaberahmen.
+            buehne = page.query_selector(".zuschnitt__buehne").bounding_box()
+            page.mouse.click(buehne["x"] + 0.6 * buehne["width"], buehne["y"] + 0.7 * buehne["height"])
+            breite = page.evaluate(
+                "() => document.querySelector('[data-bereich=\"empfaenger\"]').style.width"
+            )
+            self.assertGreater(
+                float(breite.rstrip("%")), 50, "Ein Tipp setzt einen Rahmen in Vorgabegröße"
+            )
+
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
     )

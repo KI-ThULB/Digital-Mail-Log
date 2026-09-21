@@ -40,6 +40,11 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
    beides, wenn beides auf der Sendung steht; sonst genügt eine Seite.
    Dann **„Markiertes erkennen“**.
 
+   **Großzügig ziehen.** Lieber etwas Papier mit im Rahmen als ein
+   angeschnittener Buchstabe: eine halbe Letter ist für die Erkennung schlimmer
+   als gar keine. Ein schmaler Streifen — etwa ein quer am Rand gedruckter
+   Absender — ist ausdrücklich erlaubt.
+
    **Damit entscheiden Sie über die Zuordnung, nicht die Maschine.** Das ist der
    Grund für diesen Handgriff: die App muss dann nur noch lesen. Kleine Bereiche
    liest sie außerdem deutlich schneller und sicherer als ein ganzes Etikett.

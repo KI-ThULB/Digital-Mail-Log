@@ -10,9 +10,9 @@ Stand 21.09.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser und Portokorpus (`tests/js/`) | 26 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 10 | bestanden |
-| **Summe** | **124** | **bestanden** |
+| Adressparser und Portokorpus (`tests/js/`) | 29 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 11 | bestanden |
+| **Summe** | **128** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -92,6 +92,12 @@ jeder Bereich einzeln erkannt. Die Angaben landen auf der Seite, die markiert
 wurde — nicht auf der anderen —, mitmarkierte Beschriftungen („Empfänger:“)
 landen in keinem Feld, und der Statustext benennt jede Seite einzeln. Geprüft ist
 damit auch die Umrechnung von Anteilen in Bildpunkte.
+
+**Quer liegende Sendungen.** Am gedrehten Prüfumschlag: „↻ Drehen“ richtet Bild
+**und** Markierungen auf (aus der Breite wird die Höhe), und ohne Zutun findet
+die Erkennung die Leserichtung selbst. Am echten Foto nachgemessen — es liegt
+nicht im Repository —: 85 % Zuversicht in 449 ms, Anschrift vollständig, Drehung
+270° selbst gefunden.
 
 **Angeschlossene Kamera.** Mit einer erzeugten Kamera von Chromium: Kamera
 öffnen, Bild abnehmen, Markieren steht mit diesem Bild bereit, und die Kamera
@@ -182,3 +188,9 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     `createImageBitmap` folgt ihr nicht überall; ein quer aufgenommenes
     Telefonfoto war damit für die Erkennung praktisch unlesbar. Behoben: das Bild
     wird über ein `<img>`-Element geladen.
+13. **Die Suchdrehung verschob den markierten Bereich.** Sie wurde auf das ganze
+    Bild angewandt und der Ausschnitt danach genommen — bei jeder Drehung lag der
+    markierte Bereich damit woanders auf der Sendung. Gelesen wurde mit 84 %
+    Zuversicht, und es fehlte der halbe Adressblock. Behoben: erst schneiden,
+    dann drehen. **Nur am echten Foto sichtbar geworden**; die erfundene Vorlage
+    hatte das ganze Bild markiert und konnte den Fehler nicht zeigen.

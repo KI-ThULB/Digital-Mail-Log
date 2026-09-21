@@ -128,9 +128,16 @@ verschiedene Wege.
    ganzen Kette: es macht die Fläche klein **und** nimmt der Maschine das Deuten
    ab. Siehe E09 und E11 in `docs/ENTSCHEIDUNGEN.md`.
 2. **Vorbereiten.** `prepareImage` lädt das Bild über ein `<img>`-Element, damit
-   die Drehung aus den EXIF-Angaben berücksichtigt wird – ein um 90° gedrehtes
-   Bild ist praktisch unlesbar –, schneidet zu, verkleinert auf 1600 Pixel
-   Kantenlänge und entsättigt.
+   die Drehung aus den EXIF-Angaben berücksichtigt wird, richtet es auf die
+   angezeigte Leserichtung aus (`rotate`), **schneidet dann den markierten
+   Bereich heraus** und dreht erst diesen für den jeweiligen Leseversuch
+   (`nachdrehen`). Die Reihenfolge ist wesentlich: andersherum läge der
+   markierte Bereich bei jeder Drehung woanders. Zuletzt wird auf 1600 Pixel
+   Kantenlänge verkleinert und entsättigt.
+2a. **Leserichtung suchen.** Trägt das Ergebnis nicht – zu geringe Zuversicht
+   oder keine Anschrift –, werden die übrigen drei Vierteldrehungen versucht und
+   die beste genommen. Ein quer liegender Umschlag ist sonst unlesbar. Siehe
+   E13.
 3. **Erkennen.** Der Anschluss liefert Text, Dauer und Zuversicht.
 4. **Zerlegen.** Bei einem markierten Bereich steht die Seite fest: der Text
    wird mit `ohneAnkerbeschriftung` von mitmarkierten Beschriftungen befreit und

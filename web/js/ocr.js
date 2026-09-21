@@ -46,16 +46,48 @@ export async function ladeBild(blob) {
   }
 }
 
+/** Die vier Leserichtungen, in denen eine Anschrift auf einem Bild stehen kann. */
+export const DREHUNGEN = [0, 90, 180, 270];
+
+/**
+ * Dreht ein Bild um ein Vielfaches von 90° und gibt eine Zeichenfläche zurück.
+ *
+ * Nötig, weil ein Umschlag quer auf dem Tisch liegt oder quer fotografiert wird.
+ * Die Texterkennung liest nur waagerechte Zeilen; steht die Anschrift hochkant,
+ * deutet sie die Zeichen einzeln und liefert Unsinn. Kein Nachbearbeiten hilft
+ * dagegen – das Bild muss vorher stehen.
+ */
+export function dreheBild(bild, grad) {
+  const breite = bild.naturalWidth || bild.width;
+  const hoehe = bild.naturalHeight || bild.height;
+  const quer = ((((grad % 360) + 360) % 360) % 180) !== 0;
+  const leinwand = document.createElement('canvas');
+  leinwand.width = quer ? hoehe : breite;
+  leinwand.height = quer ? breite : hoehe;
+  const stift = leinwand.getContext('2d');
+  stift.translate(leinwand.width / 2, leinwand.height / 2);
+  stift.rotate((grad * Math.PI) / 180);
+  stift.drawImage(bild, -breite / 2, -hoehe / 2);
+  return leinwand;
+}
+
 /**
  * Verkleinert und entsättigt das Bild. Das beschleunigt die Erkennung deutlich.
  *
+ * @param options.rotate Drehung in Grad (0, 90, 180, 270), vor dem Ausschnitt
+ *        angewandt. Der Ausschnitt gilt also im gedrehten Bild – so, wie die
+ *        erfassende Person es auf dem Bildschirm sieht und markiert hat.
  * @param options.crop Ausschnitt in Anteilen des Bildes (0…1), also unabhängig
  *        von der Auflösung: ``{x, y, w, h}``. Gemessen an einem Paketetikett
  *        brachte der Ausschnitt mehr als jede andere Maßnahme: 28 % Zuversicht
  *        in 4,1 s für das ganze Etikett, 62 % in 0,5 s für den Adressblock.
  */
-export async function prepareImage(blob, { maxEdge = 1600, contrast = 1.25, crop = null } = {}) {
-  const quelle = await ladeBild(blob);
+export async function prepareImage(
+  blob,
+  { maxEdge = 1600, contrast = 1.25, crop = null, rotate = 0, nachdrehen = 0 } = {},
+) {
+  const geladen = await ladeBild(blob);
+  const quelle = rotate % 360 === 0 ? geladen : dreheBild(geladen, rotate);
   const ganz = { breite: quelle.naturalWidth || quelle.width, hoehe: quelle.naturalHeight || quelle.height };
   const bereich = crop
     ? {
@@ -69,14 +101,20 @@ export async function prepareImage(blob, { maxEdge = 1600, contrast = 1.25, crop
   const scale = Math.min(1, maxEdge / Math.max(bereich.breite, bereich.hoehe));
   const width = Math.max(1, Math.round(bereich.breite * scale));
   const height = Math.max(1, Math.round(bereich.hoehe * scale));
-  const canvas =
-    typeof OffscreenCanvas === 'function'
-      ? new OffscreenCanvas(width, height)
-      : Object.assign(document.createElement('canvas'), { width, height });
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  context.drawImage(quelle, bereich.x, bereich.y, bereich.breite, bereich.hoehe, 0, 0, width, height);
+  const ausschnitt = Object.assign(document.createElement('canvas'), { width, height });
+  ausschnitt
+    .getContext('2d')
+    .drawImage(quelle, bereich.x, bereich.y, bereich.breite, bereich.hoehe, 0, 0, width, height);
 
-  const image = context.getImageData(0, 0, width, height);
+  // Erst schneiden, dann suchen: die Suchdrehung wird auf den **Ausschnitt**
+  // angewandt, nicht auf das ganze Bild. Andernfalls verschöbe jede Drehung den
+  // markierten Bereich auf eine ganz andere Stelle der Sendung – ein Fehler, der
+  // sich nur am echten Foto zeigte: gelesen wurde mit 84 % Zuversicht, aber der
+  // halbe Adressblock fehlte.
+  const canvas = nachdrehen % 360 === 0 ? ausschnitt : dreheBild(ausschnitt, nachdrehen);
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+
+  const image = context.getImageData(0, 0, canvas.width, canvas.height);
   const pixels = image.data;
   for (let i = 0; i < pixels.length; i += 4) {
     const grey = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
@@ -87,7 +125,6 @@ export async function prepareImage(blob, { maxEdge = 1600, contrast = 1.25, crop
   }
   context.putImageData(image, 0, 0);
 
-  if (canvas.convertToBlob) return canvas.convertToBlob({ type: 'image/png' });
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 

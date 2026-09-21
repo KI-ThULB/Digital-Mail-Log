@@ -78,6 +78,14 @@ def _envelope_png(path: Path) -> Path:
     return path
 
 
+def _gedreht(quelle: Path, ziel: Path, grad: int = 90) -> Path:
+    """Legt ein Prüfbild quer – so, wie eine Sendung auf dem Tisch liegt."""
+    from PIL import Image
+
+    Image.open(quelle).rotate(grad, expand=True).save(ziel)
+    return ziel
+
+
 def _parcel_label_png(path: Path) -> Path:
     """Erzeugt ein erfundenes Paketetikett als Prüfbild.
 
@@ -483,6 +491,65 @@ class BrowserFlow(unittest.TestCase):
             status = page.text_content("#ocr-status")
             self.assertIn("Empfänger:", status)
             self.assertIn("Absender:", status)
+
+    @unittest.skipUnless(
+        TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
+    )
+    def test_quer_liegende_sendung_wird_aufgerichtet(self):
+        """Ein quer liegender Umschlag ist für die Erkennung sonst unlesbar.
+
+        Sie liest nur waagerechte Zeilen und deutet hochkant stehende Zeichen
+        einzeln — heraus kommt Buchstabensalat. Geprüft wird beides: dass das
+        Drehen von Hand Bild und Markierungen mitnimmt, und dass die Erkennung
+        die Leserichtung notfalls selbst findet.
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            quer = _gedreht(
+                _envelope_png(Path(folder) / "umschlag.png"), Path(folder) / "quer.png"
+            )
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.set_input_files("#foto-erkennung", str(quer))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+
+            # Das Bild steht quer: hoch statt breit.
+            hoch = page.evaluate(
+                "() => { const l = document.getElementById('zuschnitt-bild');"
+                " return l.height > l.width; }"
+            )
+            self.assertTrue(hoch, "Das Prüfbild muss quer liegen")
+
+            # Markieren, dann drehen: die Markierung muss mitwandern.
+            self._markiere("empfaenger", 0.1, 0.1, 0.9, 0.5)
+            vorher = page.evaluate(
+                "() => document.querySelector('[data-bereich=\"empfaenger\"]').style.width"
+            )
+            page.click("#zuschnitt-drehen")
+            nachher = page.evaluate(
+                "() => document.querySelector('[data-bereich=\"empfaenger\"]').style.height"
+            )
+            self.assertEqual(vorher, nachher, "Aus der Breite wird beim Drehen die Höhe")
+            breit = page.evaluate(
+                "() => { const l = document.getElementById('zuschnitt-bild');"
+                " return l.width > l.height; }"
+            )
+            self.assertTrue(breit, "Nach dem Drehen steht das Bild aufrecht")
+
+            # Für die Erkennung wieder ganz von vorn: unmarkiert, quer, und die
+            # Anwendung muss die Leserichtung allein finden.
+            page.click("#zuschnitt-abbrechen")
+            page.set_input_files("#foto-erkennung", str(quer))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+            self._markiere("empfaenger", 0.02, 0.02, 0.98, 0.98)
+            page.click("#zuschnitt-erkennen")
+            page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
+
+            empfaenger = page.input_value("#empfaenger-adresse")
+            self.assertIn("07743", empfaenger)
+            self.assertIn("Bibliotheksplatz", empfaenger)
+            self.assertIn("gedreht", page.text_content("#ocr-status"))
 
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."

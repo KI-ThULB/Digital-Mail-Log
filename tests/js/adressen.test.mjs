@@ -276,3 +276,71 @@ test('Markierter Bereich: die Anschrift wird zerlegt, die Beschriftung nicht üb
   assert.match(parsed.organisation, /Musterverlag GmbH/);
   assert.ok(!parsed.address.includes('mpfanger'));
 });
+
+// ---------------------------------------------------------------------------
+// Was ein echter Umschlag gelehrt hat
+//
+// Die Vorlage unten ist erfunden, bildet aber Zug um Zug nach, woran die
+// Erkennung an einer echten Sendung scheiterte: Postleitzahl ohne Leerzeichen,
+// Einrichtungen im Kompositum, eine Anrede allein auf einer Zeile und ein
+// Satzzeichen, das die Erkennung an den Zeilenanfang setzte.
+// ---------------------------------------------------------------------------
+
+test('Postleitzahl auch ohne Leerzeichen vor dem Ort', () => {
+  assert.deepEqual(matchPostalLine('04109Leipzig'), {
+    postalCode: '04109',
+    city: 'Leipzig',
+    country: '',
+  });
+  assert.deepEqual(matchPostalLine('04109 Leipzig'), {
+    postalCode: '04109',
+    city: 'Leipzig',
+    country: '',
+  });
+  // Eine Zahlenfolge ohne Ort bleibt keine Postleitzahlzeile.
+  assert.equal(matchPostalLine('04109'), null);
+  assert.equal(matchPostalLine('10011 41'), null);
+});
+
+test('Einrichtungen werden auch im Kompositum erkannt', () => {
+  assert.equal(looksLikeOrganisation('Universitätsbibliothek Ilmenau'), true);
+  assert.equal(looksLikeOrganisation('Landesverband Thüringen'), true);
+  assert.equal(looksLikeOrganisation('Stadtverwaltung Jena'), true);
+  assert.equal(looksLikeOrganisation('Anna Beispiel'), false);
+  assert.equal(looksLikeOrganisation('André Karliczek'), false);
+});
+
+test('Geschäftspost mit Verband, c/o und Anrede auf eigener Zeile', () => {
+  const parsed = parseAddress(
+    [
+      'Frau',
+      'Maria Muster',
+      'Deutscher Musterverband e.V.-',
+      'Landesverband Sachsen c/o',
+      'Stadtbibliothek Leipzig',
+      '; Beispielplatz 2',
+      '04109Leipzig',
+    ].join('\n'),
+  );
+  assert.equal(parsed.postalCode, '04109');
+  assert.equal(parsed.city, 'Leipzig');
+  assert.equal(parsed.street, 'Beispielplatz 2', 'Satzzeichen vom Zeilenanfang fallen weg');
+  assert.equal(parsed.person, 'Maria Muster');
+  assert.match(parsed.organisation, /Stadtbibliothek Leipzig/);
+  assert.match(parsed.organisation, /Musterverband/);
+
+  // Das Anschriftenfeld behält die Reihenfolge des Umschlags.
+  assert.equal(
+    parsed.address,
+    [
+      'Maria Muster',
+      'Deutscher Musterverband e.V.-',
+      'Landesverband Sachsen c/o',
+      'Stadtbibliothek Leipzig',
+      'Beispielplatz 2',
+      '04109 Leipzig',
+    ].join('\n'),
+  );
+  // „Frau“ allein auf einer Zeile trägt nichts und gehört in kein Feld.
+  assert.ok(!parsed.address.includes('Frau'));
+});

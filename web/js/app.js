@@ -13,7 +13,7 @@
 
 import { store, requestPersistence } from './db.js';
 import { api, ApiError, flushQueue, refreshFromServer, uuid } from './api.js';
-import { recogniseText, engineStatus, ladeBild } from './ocr.js';
+import { recogniseText, engineStatus, ladeBild, dreheBild, DREHUNGEN } from './ocr.js';
 import { parseAddress, parseLabel, ohneAnkerbeschriftung } from './adressen.js';
 import { parsePostage, displayPostage } from './porto.js';
 
@@ -579,6 +579,8 @@ const SEITEN = ['empfaenger', 'absender'];
 
 const zuschnitt = {
   blob: null,
+  bild: null,
+  drehung: 0,
   ziel: 'umschlag',
   rolle: 'empfaenger',
   bereiche: { empfaenger: null, absender: null },
@@ -596,19 +598,15 @@ function begrenze(wert, min, max) {
 async function zeigeZuschnitt(file, ziel) {
   const bereich = $('zuschnitt');
   try {
-    const bild = await ladeBild(file);
-    const leinwand = $('zuschnitt-bild');
-    const kante = 1200;
-    const faktor = Math.min(1, kante / Math.max(bild.naturalWidth, bild.naturalHeight));
-    leinwand.width = Math.max(1, Math.round(bild.naturalWidth * faktor));
-    leinwand.height = Math.max(1, Math.round(bild.naturalHeight * faktor));
-    leinwand.getContext('2d').drawImage(bild, 0, 0, leinwand.width, leinwand.height);
+    zuschnitt.bild = await ladeBild(file);
   } catch (error) {
     // Lässt sich das Bild nicht anzeigen, wird ohne Markierung erkannt.
     await runOcr(file, ziel);
     return;
   }
   zuschnitt.blob = file;
+  zuschnitt.drehung = 0;
+  zeichneVorschau();
   zuschnitt.ziel = ziel;
   zuschnitt.bereiche = { empfaenger: null, absender: null };
   zuschnitt.zug = null;
@@ -619,6 +617,40 @@ async function zeigeZuschnitt(file, ziel) {
   zeichneBereiche();
   bereich.hidden = false;
   bereich.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+/** Zeichnet das aufgenommene Bild in der gewählten Leserichtung. */
+function zeichneVorschau() {
+  const bild = zuschnitt.bild;
+  if (!bild) return;
+  const gedreht = zuschnitt.drehung ? dreheBild(bild, zuschnitt.drehung) : bild;
+  const breite = gedreht.naturalWidth || gedreht.width;
+  const hoehe = gedreht.naturalHeight || gedreht.height;
+  const kante = 1200;
+  const faktor = Math.min(1, kante / Math.max(breite, hoehe));
+  const leinwand = $('zuschnitt-bild');
+  leinwand.width = Math.max(1, Math.round(breite * faktor));
+  leinwand.height = Math.max(1, Math.round(hoehe * faktor));
+  leinwand.getContext('2d').drawImage(gedreht, 0, 0, leinwand.width, leinwand.height);
+}
+
+/**
+ * Dreht Bild und Markierungen um eine Vierteldrehung im Uhrzeigersinn.
+ *
+ * Die Markierungen werden mitgedreht, statt verworfen zu werden: wer schon
+ * markiert hat und dann merkt, dass das Bild quer liegt, soll nicht von vorn
+ * anfangen. Ein Rechteck (x, y, b, h) in Anteilen wird dabei zu
+ * (1 − y − h, x, h, b).
+ */
+function dreheZuschnitt() {
+  zuschnitt.drehung = (zuschnitt.drehung + 90) % 360;
+  for (const seite of SEITEN) {
+    const alt = zuschnitt.bereiche[seite];
+    if (!alt) continue;
+    zuschnitt.bereiche[seite] = { x: 1 - alt.y - alt.h, y: alt.x, w: alt.h, h: alt.w };
+  }
+  zeichneVorschau();
+  zeichneBereiche();
 }
 
 function waehleRolle(rolle) {
@@ -670,6 +702,7 @@ function zeichneBereiche() {
 function beendeZuschnitt() {
   $('zuschnitt').hidden = true;
   zuschnitt.blob = null;
+  zuschnitt.bild = null;
   zuschnitt.zug = null;
   zuschnitt.bereiche = { empfaenger: null, absender: null };
   zeichneBereiche();
@@ -789,17 +822,18 @@ function wireZuschnitt() {
       seite,
       flaeche: zuschnitt.bereiche[seite],
     }));
-    const blob = zuschnitt.blob;
+    const { blob, drehung } = zuschnitt;
     if (!blob || !aufgabe.length) return;
     beendeZuschnitt();
-    await erkenneBereiche(blob, aufgabe);
+    await erkenneBereiche(blob, aufgabe, drehung);
   });
   $('zuschnitt-ganz').addEventListener('click', async () => {
-    const { blob, ziel } = zuschnitt;
+    const { blob, ziel, drehung } = zuschnitt;
     if (!blob) return;
     beendeZuschnitt();
-    await runOcr(blob, ziel);
+    await runOcr(blob, ziel, null, drehung);
   });
+  $('zuschnitt-drehen').addEventListener('click', dreheZuschnitt);
   $('zuschnitt-abbrechen').addEventListener('click', () => {
     beendeZuschnitt();
     $('ocr-status').textContent = 'Abgebrochen. Die Felder lassen sich von Hand ausfüllen.';
@@ -813,11 +847,60 @@ function wireZuschnitt() {
  * hier nicht nach Empfänger und Absender gesucht, sondern nur eine Anschrift
  * zerlegt. Beschriftungen, die mit im Rechteck lagen, werden vorher entfernt.
  */
-async function erkenneBereiche(blob, aufgabe) {
+/** Trägt das Ergebnis genug, um es nicht noch einmal zu versuchen? */
+function taugt(result, parsed) {
+  return Boolean(result && result.confidence >= 0.6 && (parsed.postalCode || parsed.street));
+}
+
+/**
+ * Erkennt einen Bereich und sucht dabei die Leserichtung.
+ *
+ * Eine quer liegende Anschrift ist für die Texterkennung praktisch unlesbar:
+ * sie liest nur waagerechte Zeilen und deutet die hochkant stehenden Zeichen
+ * einzeln. Herausgekommen ist im Test Buchstabensalat – die Anwendung hatte
+ * nicht bemerkt, dass sie den Kopf schief legen müsste.
+ *
+ * Deshalb: zuerst die eingestellte Richtung. Trägt das Ergebnis, ist es fertig.
+ * Sonst werden die übrigen drei Vierteldrehungen versucht und die beste
+ * genommen – gemessen an der Zuversicht und daran, ob eine Anschrift
+ * herauskommt. Das kostet im ungünstigen Fall drei weitere Durchgänge auf einer
+ * kleinen Fläche, und nur dann, wenn es ohnehin schiefgegangen wäre.
+ */
+async function erkenneMitDrehung(blob, flaeche, anzeige = 0, start = 0) {
+  const versuch = async (drehung) => {
+    // `rotate` ist die Richtung, in der markiert wurde; `nachdrehen` ist der
+    // Versuch. Der Ausschnitt bleibt dadurch genau der markierte.
+    const result = await recogniseText(blob, {
+      crop: flaeche,
+      rotate: anzeige,
+      nachdrehen: drehung,
+    });
+    if (!result) return null;
+    const parsed = parseAddress(ohneAnkerbeschriftung(result.text));
+    // Eine gefundene Anschrift wiegt schwerer als ein guter Zuversichtswert:
+    // gerade gedrehter Text wird gelegentlich selbstbewusst falsch gelesen.
+    const guete = result.confidence + (parsed.postalCode ? 1 : 0) + (parsed.street ? 0.5 : 0);
+    return { result, parsed, drehung, guete };
+  };
+
+  let bester = await versuch(start);
+  if (bester && taugt(bester.result, bester.parsed)) return bester;
+  for (const drehung of DREHUNGEN.filter((g) => g !== start)) {
+    // eslint-disable-next-line no-await-in-loop
+    const weiterer = await versuch(drehung);
+    if (weiterer && (!bester || weiterer.guete > bester.guete)) bester = weiterer;
+    if (bester && taugt(bester.result, bester.parsed) && bester.drehung === drehung) break;
+  }
+  return bester;
+}
+
+async function erkenneBereiche(blob, aufgabe, drehung = 0) {
   const status = $('ocr-status');
   const rohtexte = [];
   const meldungen = [];
   const anmerkungen = [];
+  // Die Suchdrehung gilt zusätzlich zur Richtung, in der markiert wurde.
+  let richtung = 0;
 
   for (const [nummer, { seite, flaeche }] of aufgabe.entries()) {
     status.textContent =
@@ -825,16 +908,19 @@ async function erkenneBereiche(blob, aufgabe) {
     const begonnen = Date.now();
     try {
       // eslint-disable-next-line no-await-in-loop
-      const result = await recogniseText(blob, { crop: flaeche });
-      if (!result) {
+      const gelesen = await erkenneMitDrehung(blob, flaeche, drehung, richtung);
+      if (!gelesen) {
         status.textContent =
           'Keine lokale Texterkennung verfügbar. Bitte die Felder von Hand ausfüllen.';
         return;
       }
-      const parsed = parseAddress(ohneAnkerbeschriftung(result.text));
+      const { result, parsed } = gelesen;
+      // Die gefundene Richtung gilt für den nächsten Bereich als erster Versuch.
+      richtung = gelesen.drehung;
       rohtexte.push(`— ${ZIELWORT[seite]} —\n${result.text || '(kein Text erkannt)'}`);
       anmerkungen.push(
         `${ZIELWORT[seite]}: ${result.durationMs} ms · Zuversicht ${(result.confidence * 100).toFixed(0)} %` +
+          (gelesen.drehung ? ` · um ${gelesen.drehung}° gedreht gelesen` : '') +
           (parsed.notes.length ? ` · ${parsed.notes.join(' ')}` : ''),
       );
       const dauer = `${((Date.now() - begonnen) / 1000).toFixed(1)} s`;
@@ -842,7 +928,10 @@ async function erkenneBereiche(blob, aufgabe) {
         fuelleSeite(seite, parsed);
         if (parsed.shipmentType && !$('art').value) $('art').value = parsed.shipmentType;
         state.dirty = true;
-        meldungen.push(`${ZIELWORT[seite]}: übernommen (${dauer}).`);
+        meldungen.push(
+          `${ZIELWORT[seite]}: übernommen (${dauer}` +
+            `${gelesen.drehung ? `, um ${gelesen.drehung}° gedreht` : ''}).`,
+        );
       } else {
         meldungen.push(`${ZIELWORT[seite]}: nichts Sicheres gelesen (${dauer}) – bitte tippen.`);
       }
@@ -983,12 +1072,32 @@ function wireKamera() {
   window.addEventListener('pagehide', kameraStoppen);
 }
 
-async function runOcr(file, ziel = 'umschlag', crop = null) {
+async function runOcr(file, ziel = 'umschlag', crop = null, drehung = 0) {
   const status = $('ocr-status');
   const started = Date.now();
   status.textContent = `Erkennung läuft (${ZIELWORT[ziel]}) …`;
   try {
-    const result = await recogniseText(file, crop ? { crop } : {});
+    // Auch ohne Markierung wird die Leserichtung gesucht: ein quer liegender
+    // Umschlag ist sonst unlesbar, und das Bild sagt von sich aus nichts darüber.
+    const versuche = DREHUNGEN;
+    let result = null;
+    let beste = -1;
+    let gefunden = 0;
+    for (const grad of versuche) {
+      // eslint-disable-next-line no-await-in-loop
+      const versuch = await recogniseText(file, {
+        ...(crop ? { crop } : {}),
+        rotate: drehung,
+        nachdrehen: grad,
+      });
+      if (!versuch) break;
+      if (versuch.confidence > beste) {
+        beste = versuch.confidence;
+        result = versuch;
+        gefunden = grad;
+      }
+      if (versuch.confidence >= 0.7) break;
+    }
     if (!result) {
       status.textContent =
         'Keine lokale Texterkennung verfügbar. Bitte die Felder von Hand ausfüllen.';
@@ -1006,6 +1115,7 @@ async function runOcr(file, ziel = 'umschlag', crop = null) {
     $('ocr-herkunft').textContent =
       `${result.source} · ${result.model} · ${result.durationMs} ms · ` +
       `Zuversicht der Erkennung ${(result.confidence * 100).toFixed(0)} %` +
+      (gefunden ? ` · um ${gefunden}° gedreht gelesen` : '') +
       (gelesen.notes.length ? ` · ${gelesen.notes.join(' ')}` : '');
     $('ocr-ergebnis').hidden = false;
     $('ocr-ergebnis').open = true;

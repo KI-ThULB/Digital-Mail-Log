@@ -44,6 +44,11 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
    Grund für diesen Handgriff: die App muss dann nur noch lesen. Kleine Bereiche
    liest sie außerdem deutlich schneller und sicherer als ein ganzes Etikett.
 
+   **Liegt die Sendung quer im Bild**, mit **↻ Drehen** aufrichten — das macht
+   das Markieren leichter, und die Erkennung liest aufrechte Zeilen deutlich
+   besser. Vergessen Sie es, ist es kein Beinbruch: die App probiert die anderen
+   Leserichtungen dann selbst durch, braucht dafür aber ein paar Sekunden länger.
+
    Bei einem sauberen Fensterumschlag geht es auch ohne: **„Ganzes Bild“**
    übernimmt den großen Adressblock als Empfänger und eine kleine Zeile darüber
    als Absender. Steht auf der Sendung ausdrücklich „Empfänger“ oder „Absender“

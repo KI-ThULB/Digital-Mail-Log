@@ -18,6 +18,13 @@ const RECHTSFORMEN = [
   'fakultaet', 'dezernat', 'referat', 'abteilung', 'rechenzentrum', 'verbund',
 ];
 
+/** Bestandteile, die am Ende eines zusammengesetzten Wortes eine Einrichtung anzeigen. */
+const KOMPOSITA = [
+  'bibliothek', 'verband', 'universitat', 'hochschule', 'verwaltung', 'klinikum',
+  'museum', 'archiv', 'akademie', 'ministerium', 'amt', 'institut', 'druckerei',
+  'buchhandlung', 'schule', 'kammer', 'stiftung', 'zentrum', 'werke', 'gesellschaft',
+];
+
 const ANREDEN = [
   'herrn', 'herr', 'frau', 'familie', 'firma', 'an', 'z.hd.', 'z. hd.', 'z.h.',
   'zu händen', 'zu haenden', 'c/o', 'co', 'p.a.', 'i.a.',
@@ -124,7 +131,9 @@ function tidy(text) {
     .replace(/\r\n?/g, '\n')
     .replace(/[|¦]/g, '\n')
     .split('\n')
-    .map((line) => line.replace(/\s+/g, ' ').trim())
+    // Führende Satzzeichen stammen aus der Erkennung, nicht vom Umschlag: aus
+    // einem Rand wird gern ein „;“ oder „|“ vor der Straße.
+    .map((line) => line.replace(/\s+/g, ' ').replace(/^[^\p{L}\p{N}]+/u, '').trim())
     .filter(Boolean);
 }
 
@@ -134,7 +143,9 @@ function isNoise(line) {
 
 /** Erkennt „07743 Jena“, „D-07743 Jena“, „CH-8001 Zürich“. */
 export function matchPostalLine(line) {
-  const german = line.match(/^(?:(?:d|de)\s*-\s*)?(\d{5})\s+(.+)$/i);
+  // „07743 Jena“, aber auch „07743Jena“: auf einem echten Umschlag stand das
+  // Leerzeichen nicht, und die Erkennung erfindet keines.
+  const german = line.match(/^(?:(?:d|de)\s*-\s*)?(\d{5})[\s-]*([A-Za-zÄÖÜäöüß].*)$/i);
   if (german) return { postalCode: german[1], city: german[2].trim(), country: '' };
   const foreign = line.match(/^([A-Z]{1,3})\s*-\s*(\d{4,6})\s+(.+)$/i);
   if (foreign) {
@@ -199,10 +210,19 @@ export function looksLikePerson(line) {
 export function looksLikeOrganisation(line) {
   const normalised = normalise(line);
   if (!normalised) return false;
-  return RECHTSFORMEN.some((form) => {
+  const alsWort = RECHTSFORMEN.some((form) => {
     const needle = normalise(form);
     return normalised === needle || normalised.includes(` ${needle}`) || normalised.startsWith(`${needle} `);
   });
+  if (alsWort) return true;
+  // Deutsche Einrichtungen stehen meist im Kompositum: „Universitätsbibliothek“,
+  // „Landesverband“, „Stadtverwaltung“. Ohne diese Prüfung fiel auf einem echten
+  // Umschlag die Bibliothek durch und landete über eine Auffangregel im Feld.
+  return normalised
+    .split(' ')
+    .some((wort) =>
+      KOMPOSITA.some((teil) => wort.length > teil.length && wort.endsWith(teil)),
+    );
 }
 
 /**
@@ -404,12 +424,29 @@ export function parseAddress(text) {
   const verankert = postalIndex !== -1 || streetIndex !== -1;
   const organisationLines = [];
   const personLines = [];
+  // Das Anschriftenfeld behält die Reihenfolge des Umschlags. Die Felder für
+  // Name und Organisation ordnen ein; die Anschrift bleibt, wie sie dastand.
+  const kopfzeilen = [];
   let verworfen = uebergangen;
   for (const line of head) {
-    if (looksLikeOrganisation(line)) organisationLines.push(line);
-    else if (looksLikePerson(line)) personLines.push(stripSalutation(line).text);
-    else if (verankert && istLesbar(line) && !istFremdzeile(line)) organisationLines.push(line);
-    else verworfen += 1;
+    const { text: ohneAnrede, had } = stripSalutation(line);
+    // Eine Zeile, die nur aus „Herrn“ oder „Firma“ besteht, trägt nichts.
+    if (had && !ohneAnrede) {
+      verworfen += 1;
+      continue;
+    }
+    if (looksLikeOrganisation(line)) {
+      organisationLines.push(line);
+      kopfzeilen.push(line);
+    } else if (looksLikePerson(line)) {
+      personLines.push(ohneAnrede);
+      kopfzeilen.push(ohneAnrede);
+    } else if (verankert && istLesbar(line) && !istFremdzeile(line)) {
+      organisationLines.push(line);
+      kopfzeilen.push(line);
+    } else {
+      verworfen += 1;
+    }
   }
   if (verworfen) notes.push(`${verworfen} Zeile(n) waren nicht zuzuordnen und blieben außen vor.`);
 
@@ -421,8 +458,7 @@ export function parseAddress(text) {
   const person = personLines.join(', ');
   const organisation = organisationLines.join(', ');
   const address = [
-    ...organisationLines,
-    ...personLines,
+    ...kopfzeilen,
     street,
     [postalCode, city].filter(Boolean).join(' '),
     country && country !== 'Deutschland' ? country : '',

@@ -293,3 +293,40 @@ bleibt der Zusatz klein.
 **Offen.** Ob ein fester Kameraarbeitsplatz schneller ist als das Telefon in der
 Hand, ist nicht gemessen. Der Pilotbetrieb kann beides mitführen: derselbe Weg
 `E` im Messprotokoll, mit einer Bemerkung, womit aufgenommen wurde.
+
+---
+
+## E13 · Die Leserichtung wird gesucht, nicht vorausgesetzt (21.09.2026)
+
+**Entscheidung.** Das Bild lässt sich mit **↻ Drehen** von Hand aufrichten;
+Markierungen drehen sich mit. Zusätzlich sucht die Erkennung die Leserichtung
+selbst: zuerst die eingestellte, und wenn das Ergebnis nicht trägt, die übrigen
+drei Vierteldrehungen. Genommen wird die beste – gemessen an der Zuversicht und
+daran, ob eine Anschrift herauskommt.
+
+**Begründung.** Ein Umschlag liegt quer auf dem Tisch, und quer wird er
+fotografiert. Die Texterkennung liest ausschließlich waagerechte Zeilen; steht
+die Anschrift hochkant, deutet sie die Zeichen einzeln und liefert Buchstaben­salat
+mit hoher Zuversicht. Kein Nachbearbeiten hilft dagegen – das Bild muss vorher
+stehen. Die EXIF-Drehung aus E09 löst nur den halben Fall: sie richtet das Bild
+so aus, wie die Kamera gehalten wurde, nicht so, wie die Sendung darin liegt. Im
+Test war es sogar die EXIF-Drehung, die den quer fotografierten Umschlag erst
+hochkant stellte.
+
+**Preis.** Im ungünstigen Fall drei zusätzliche Durchgänge – auf einer markierten
+Fläche je etwa eine halbe Sekunde, und nur dann, wenn es ohne sie schiefginge.
+Der erste gefundene Winkel gilt für den nächsten Bereich als erster Versuch, ein
+zweiter Bereich kostet also nichts extra.
+
+**Ein Fehler, den nur das echte Foto zeigte.** Zuerst wurde die Suchdrehung auf
+das **ganze Bild** angewandt und der Ausschnitt danach genommen – damit lag der
+markierte Bereich bei jeder Drehung woanders auf der Sendung. Gelesen wurde mit
+84 % Zuversicht, und es fehlte der halbe Adressblock. Richtig ist: erst
+schneiden, dann drehen. Die erfundene Prüfvorlage hätte das nie gezeigt, weil
+dort das ganze Bild markiert war.
+
+**Mitgelernt.** Drei Dinge, an denen die Zerlegung an einer echten Sendung
+scheiterte, sind behoben: „07743Jena“ ohne Leerzeichen, Einrichtungen im
+Kompositum („Universitätsbibliothek“, „Landesverband“) und ein Satzzeichen, das
+die Erkennung an den Zeilenanfang setzt. Das Anschriftenfeld behält außerdem die
+Reihenfolge des Umschlags, statt nach Organisation und Person umzusortieren.

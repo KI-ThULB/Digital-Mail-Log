@@ -585,6 +585,44 @@ class BrowserFlow(unittest.TestCase):
             self.assertIn("Bibliotheksplatz", page.input_value("#absender-adresse"))
             self.assertEqual(page.input_value("#empfaenger-adresse"), "")
 
+    def test_postleitzahl_prueft_den_ort(self):
+        """Der gemeldete Fall: die Erkennung las „WE“, wo „WEIMAR“ stand.
+
+        Die Postleitzahl daneben ist fünfstellig und eindeutig — sie weiß, wie
+        der Ort heißt. Geprüft wird gegen eine Tabelle im eigenen
+        Webverzeichnis; es geht keine Anschrift an einen Kartendienst.
+        """
+        page = self.page
+        page.goto(self.base)
+        page.wait_for_selector("#kennung:not(:empty)")
+        page.click("#neu")
+
+        # Abgekürzter Ort: die Prüfung bietet den vollen Namen an.
+        page.fill("#empfaenger-adresse", "Musterverein e.V.\nBeispielweg 3\n99423 WE")
+        page.wait_for_selector("#empfaenger-pruefung:not([hidden])")
+        meldung = page.text_content("#empfaenger-pruefung")
+        self.assertIn("Weimar", meldung)
+        self.assertIn("WE", meldung)
+
+        page.click("#empfaenger-pruefung button")
+        self.assertEqual(
+            page.input_value("#empfaenger-adresse"),
+            "Musterverein e.V.\nBeispielweg 3\n99423 Weimar",
+        )
+        # Nach der Übernahme stimmt es, und die Meldung verschwindet.
+        page.wait_for_selector("#empfaenger-pruefung", state="hidden")
+
+        # Eine stimmige Anschrift löst gar keine Meldung aus.
+        page.fill("#absender-adresse", "Musterverlag GmbH\nBeispielweg 3\n07743 Jena")
+        page.wait_for_timeout(200)
+        self.assertTrue(page.is_hidden("#absender-pruefung"))
+
+        # Ein Widerspruch wird benannt, aber nichts stillschweigend geändert.
+        page.fill("#absender-adresse", "Musterverlag GmbH\nBeispielweg 3\n07743 Erfurt")
+        page.wait_for_selector("#absender-pruefung:not([hidden])")
+        self.assertIn("Jena", page.text_content("#absender-pruefung"))
+        self.assertIn("07743 Erfurt", page.input_value("#absender-adresse"))
+
     def test_interne_stelle_per_schnellwahl(self):
         page = self.page
         page.goto(self.base)

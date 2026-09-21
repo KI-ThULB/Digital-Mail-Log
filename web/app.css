@@ -575,3 +575,19 @@ button.chip.is-active {
 .kamera .field { max-width: 320px; margin-top: 8px; }
 .kamera__buehne { margin-top: 8px; background: #000; line-height: 0; border-radius: 10px; overflow: hidden; }
 .kamera__bild { display: block; width: 100%; max-height: 60vh; object-fit: contain; }
+
+/* ---------- Plausibilitätsprüfung der Anschrift ---------- */
+
+.pruefung {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warn-flaeche);
+  color: var(--warn);
+  font-size: 0.9rem;
+}
+.pruefung button { background: var(--papier); border: 1px solid currentColor; color: inherit; padding: 0 12px; min-height: 38px; }

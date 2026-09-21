@@ -205,6 +205,7 @@
                   <span>Anschrift</span>
                   <textarea id="absender-adresse" rows="3"></textarea>
                 </label>
+                <div id="absender-pruefung" class="pruefung" aria-live="polite" hidden></div>
                 <div id="absender-vorschlaege" class="suggestions" aria-live="polite"></div>
               </div>
             </div>
@@ -234,6 +235,7 @@
                   <span>Anschrift</span>
                   <textarea id="empfaenger-adresse" rows="3"></textarea>
                 </label>
+                <div id="empfaenger-pruefung" class="pruefung" aria-live="polite" hidden></div>
                 <div id="empfaenger-vorschlaege" class="suggestions" aria-live="polite"></div>
               </div>
             </div>
@@ -323,6 +325,12 @@
     <footer class="footer">
       <span id="speicher-info" class="muted"></span>
       <span id="warteschlange" class="muted"></span>
+      <!-- Namensnennung, wie die Lizenz der Ortsdaten sie verlangt. -->
+      <span class="muted">
+        Ortsdaten:
+        <a href="https://www.geonames.org/" rel="noopener">GeoNames</a>,
+        <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>
+      </span>
     </footer>
 
     <script type="module" src="js/app.js"></script>

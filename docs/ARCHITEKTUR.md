@@ -37,6 +37,9 @@ Mobilgerät oder Arbeitsplatz                    Server der Einrichtung
 | `web/` | Die Web-App: Rumpf, Gestaltung, Module, Service Worker. |
 | `web/js/adressen.js` | Zerlegung erkannten Textes in Adressfelder. |
 | `web/js/ocr.js` | Austauschbarer Anschluss für die Texterkennung. |
+| `web/js/plz.js` | Plausibilitätsprüfung der Anschrift, auf dem Gerät. |
+| `web/daten/` | Postleitzahl-Ort-Tabelle samt Lizenz (GeoNames, CC BY 4.0). |
+| `werkzeuge/` | Skripte, die mitgelieferte Daten erzeugen. |
 | `web/vendor/` | Bestandteile der Erkennung, per Skript geholt, nicht im Repository. |
 | `tests/konformitaet/` | Gemeinsamer Prüfkorpus für Fachkern und Web-App. |
 | `archiv/` | Abgelöste Entwürfe mit Begründung. |
@@ -151,6 +154,20 @@ verschiedene Wege.
    Oberfläche sagt es, je Seite einzeln. In einem markierten Bereich genügt ein
    Anker – Postleitzahl oder Straße –, weil die Markierung selbst eine Aussage
    ist. Siehe E10 und E11.
+
+## Plausibilitätsprüfung der Anschrift
+
+Die Postleitzahl ist fünfstellig, gut lesbar und eindeutig; der Ortsname ist die
+Stelle, an der die Erkennung scheitert. `web/js/plz.js` vergleicht beides gegen
+`web/daten/plz-orte.txt` und meldet vier Fälle: **stimmt**, **ergänzen** (kein
+Ort gelesen), **Abkürzung** („WE“ → „Weimar“) und **Widerspruch**. Übernommen
+wird nichts von selbst – die Oberfläche bietet es an.
+
+**Die Prüfung läuft auf dem Gerät.** Es geht keine Anschrift an einen
+Kartendienst. Die Tabelle stammt von GeoNames (CC BY 4.0), wird mit
+`werkzeuge/plz-tabelle.py` erzeugt und liegt im eigenen Webverzeichnis; der
+Service Worker hält sie vor, damit die Prüfung auch ohne Netz arbeitet. Begründung
+und Grenzen: E14 in `docs/ENTSCHEIDUNGEN.md`.
 
 ## Rechte
 

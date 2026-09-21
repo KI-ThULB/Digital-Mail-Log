@@ -28,7 +28,11 @@ const SHELL_FILES = [
   'js/db.js',
   'js/ocr.js',
   'js/adressen.js',
+  'js/plz.js',
   'js/porto.js',
+  // Die Postleitzahltabelle gehört zur App: die Prüfung soll auch ohne Netz
+  // arbeiten – eine Poststelle im Keller hat oft keines.
+  'daten/plz-orte.txt',
   'manifest.webmanifest',
   'icons/icon.svg',
 ];

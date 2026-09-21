@@ -1,0 +1,16 @@
+Die Datei plz-orte.txt ist aus dem Postleitzahl-Export von GeoNames abgeleitet.
+
+    Quelle : GeoNames, https://download.geonames.org/export/zip/DE.zip
+    Lizenz : Creative Commons Attribution 4.0 (CC BY 4.0)
+             https://creativecommons.org/licenses/by/4.0/
+    Stand  : siehe Kopfzeile von plz-orte.txt
+
+Namensnennung: "This work is based on data by GeoNames (geonames.org),
+licensed under CC BY 4.0."
+
+Erzeugt mit werkzeuge/plz-tabelle.py. Die Ableitung beschränkt sich auf
+Postleitzahl und Ortsnamen; Großempfänger-Postleitzahlen, bei denen im Datensatz
+statt eines Ortes ein Unternehmen steht, sind ausgelassen.
+
+Die Tabelle dient allein der Plausibilitätsprüfung auf dem Gerät. Es werden
+keine Anschriften an Dritte übermittelt.

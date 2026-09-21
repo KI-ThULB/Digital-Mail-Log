@@ -14,7 +14,8 @@
 import { store, requestPersistence } from './db.js';
 import { api, ApiError, flushQueue, refreshFromServer, uuid } from './api.js';
 import { recogniseText, engineStatus, ladeBild, dreheBild, DREHUNGEN } from './ocr.js';
-import { parseAddress, parseLabel, ohneAnkerbeschriftung } from './adressen.js';
+import { parseAddress, parseLabel, ohneAnkerbeschriftung, ersetzeOrt } from './adressen.js';
+import { ladeTabelle, pruefeAnschrift } from './plz.js';
 import { parsePostage, displayPostage } from './porto.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1144,6 +1145,54 @@ function fuelleSeite(seite, quelle) {
   // Person bleibt das Namensfeld leer – das ist die richtige Angabe.
   if (quelle.address && !anschrift.value) anschrift.value = quelle.address;
   suggestContacts(seite);
+  pruefeSeite(seite);
+}
+
+/* ------------------------------------------------------------------ *
+ * Plausibilitätsprüfung der Anschrift
+ *
+ * Die Postleitzahl ist fünfstellig, gut lesbar und eindeutig – sie weiß, wie
+ * der Ort heißt. Als die Erkennung „WE“ statt „WEIMAR“ lieferte, war das kein
+ * Wissens-, sondern ein Abgleichproblem. Geprüft wird auf dem Gerät gegen eine
+ * eigene Tabelle; es geht keine Anschrift an einen Kartendienst.
+ *
+ * Geändert wird nichts von selbst. Die Prüfung sagt, was sie weiß, und bietet
+ * die Übernahme an – dieselbe Linie wie bei der Erkennung.
+ * ------------------------------------------------------------------ */
+
+function pruefeSeite(seite) {
+  const bereich = $(`${seite}-pruefung`);
+  const feld = $(`${seite}-adresse`);
+  const zerlegt = parseAddress(feld.value);
+  const { status, vorschlag } = pruefeAnschrift(zerlegt);
+
+  if (status === 'unbekannt' || status === 'stimmt' || !vorschlag) {
+    bereich.hidden = true;
+    bereich.replaceChildren();
+    return;
+  }
+
+  const text = {
+    ergaenzen: `Zur Postleitzahl ${zerlegt.postalCode} gehört ${vorschlag}. Kein Ort erkannt.`,
+    abkuerzung: `Erkannt: „${zerlegt.city}“. Zur Postleitzahl ${zerlegt.postalCode} gehört ${vorschlag}.`,
+    widerspruch:
+      `Erkannt: „${zerlegt.city}“, zur Postleitzahl ${zerlegt.postalCode} gehört aber ${vorschlag}. ` +
+      'Bitte am Umschlag prüfen – es kann auch die Postleitzahl falsch gelesen sein.',
+  }[status];
+
+  bereich.replaceChildren(
+    el('span', { text }),
+    el('button', {
+      type: 'button',
+      text: `${vorschlag} übernehmen`,
+      onclick: () => {
+        feld.value = ersetzeOrt(feld.value, vorschlag);
+        state.dirty = true;
+        pruefeSeite(seite);
+      },
+    }),
+  );
+  bereich.hidden = false;
 }
 
 /** Unterhalb dieser Zuversicht muss das Ergebnis für sich sprechen. */
@@ -1502,6 +1551,7 @@ function wire() {
   for (const seite of ['absender', 'empfaenger']) {
     $(`${seite}-name`).addEventListener('input', () => suggestContacts(seite));
     $(`${seite}-org`).addEventListener('input', () => suggestContacts(seite));
+    $(`${seite}-adresse`).addEventListener('input', () => pruefeSeite(seite));
     $(`merken-${seite}`).addEventListener('click', () => merkeAlsIntern(seite));
     $(`foto-${seite}`).addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
@@ -1548,6 +1598,9 @@ async function start() {
   wire();
   wireZuschnitt();
   wireKamera();
+  // Die Postleitzahltabelle ist eine Hilfe, keine Voraussetzung: fehlt sie,
+  // bleibt die Prüfung stumm und alles andere funktioniert weiter.
+  ladeTabelle().catch(() => {});
   renderConnection();
   state.form = blankForm();
 

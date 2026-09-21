@@ -92,6 +92,14 @@ Einmalig für die lokale Texterkennung: `./web/vendor/hole-tesseract.sh` — run
 19 MB, die anschließend vom eigenen Server ausgeliefert werden. Zur Laufzeit wird
 nichts bei Dritten abgefragt.
 
+Mitgeliefert ist außerdem `web/daten/plz-orte.txt` (186 KB): eine Postleitzahl-
+Ort-Tabelle für die Plausibilitätsprüfung der Anschriften. Quelle GeoNames,
+CC BY 4.0, Namensnennung in `web/daten/LIZENZ-plz.txt` und in der Fußzeile der
+Anwendung. Neu erzeugen mit `python3 werkzeuge/plz-tabelle.py` — der einzige
+Schritt, der überhaupt ins Netz geht, und er gehört in die Pflegeroutine, nicht
+in den Betrieb. **Die Prüfung selbst läuft auf dem Gerät; es werden keine
+Anschriften an Kartendienste übermittelt.**
+
 ## Sicherung
 
 ```sh

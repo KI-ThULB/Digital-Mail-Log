@@ -10,9 +10,9 @@ Stand 21.09.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser und Portokorpus (`tests/js/`) | 31 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 11 | bestanden |
-| **Summe** | **130** | **bestanden** |
+| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 39 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 12 | bestanden |
+| **Summe** | **139** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -93,6 +93,13 @@ wurde — nicht auf der anderen —, mitmarkierte Beschriftungen („Empfänger:
 landen in keinem Feld, und der Statustext benennt jede Seite einzeln. Geprüft ist
 damit auch die Umrechnung von Anteilen in Bildpunkte.
 
+**Postleitzahl prüft den Ort.** Der gemeldete Fall „WE“ statt „WEIMAR“: die
+Prüfung bietet „Weimar“ an, die Übernahme schreibt die Zeile neu, danach
+verschwindet die Meldung. Eine stimmige Anschrift löst keine aus; ein
+Widerspruch wird benannt, ohne etwas zu ändern. Umlaute und ihre Umschreibung
+gelten als gleich („München“ / „Muenchen“). Geprüft wird gegen die mitgelieferte
+Tabelle — **ohne jede Abfrage nach außen**.
+
 **Absender ohne Anschrift.** Steht als Absender nur der Name des Hauses — quer
 am Rand gedruckt, ohne Straße und Ort —, wird er übernommen statt verworfen.
 Ohne erkannte Person bleibt das Namensfeld leer; früher wanderte die
@@ -146,6 +153,11 @@ Bauumgebung beurteilen:
 * **Dauerhaftigkeit des lokalen Speichers.** Die App bittet den Browser um eine
   Zusage und zeigt an, ob sie erteilt wurde. Das Verhalten bei knappem Speicher
   ist am Gerät zu beobachten.
+* **Aktualität der Postleitzahltabelle.** Sie ist ein Abzug vom Erzeugungstag.
+  Das Neuerzeugen ist ein Aufruf, gehört aber in die Pflegeroutine — geprüft ist
+  nur, dass die Prüfung mit der vorhandenen Tabelle richtig urteilt.
+* **Straße und Hausnummer** werden nicht geprüft. Dafür bräuchte es einen um
+  Größenordnungen größeren Datenbestand.
 * **Sicherung und Wiederherstellung.** Noch nicht geprobt.
 * **Anmeldung.** Der Vorschaltserver ist beschrieben, aber nicht eingerichtet.
   Insbesondere ist nicht geprüft, ob das Kopffeld mit der Benutzerkennung von

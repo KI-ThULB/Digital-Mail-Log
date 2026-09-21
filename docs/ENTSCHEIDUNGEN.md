@@ -330,3 +330,48 @@ scheiterte, sind behoben: „07743Jena“ ohne Leerzeichen, Einrichtungen im
 Kompositum („Universitätsbibliothek“, „Landesverband“) und ein Satzzeichen, das
 die Erkennung an den Zeilenanfang setzt. Das Anschriftenfeld behält außerdem die
 Reihenfolge des Umschlags, statt nach Organisation und Person umzusortieren.
+
+---
+
+## E14 · Anschriften werden auf dem Gerät geprüft, nicht bei einem Kartendienst (21.09.2026)
+
+**Entscheidung.** Die Anwendung prüft die Anschrift gegen eine mitgelieferte
+Postleitzahl-Ort-Tabelle und bietet Vervollständigungen an. Sie fragt **keinen**
+Kartendienst – weder Google noch das öffentliche Nominatim.
+
+**Anlass.** Die Erkennung las „WE“, wo „WEIMAR“ stand. Die Postleitzahl daneben
+ist fünfstellig, gut lesbar und eindeutig; sie weiß, wie der Ort heißt.
+
+**Warum nicht online.** Zwei voneinander unabhängige Gründe:
+
+1. **Datenschutz.** Eine Poststelle verarbeitet Anschriften Dritter. Jede
+   Abfrage trüge Absender- und Empfängerdaten echter Post aus dem Haus und
+   kippte damit die Zusage, auf der das Vorhaben steht: dass nichts das Gerät
+   verlässt. Es bräuchte Rechtsgrundlage, Auftragsverarbeitungsvertrag und einen
+   Eintrag im Verzeichnis der Verarbeitungstätigkeiten.
+2. **Nutzungsbedingungen.** Die Nominatim-Richtlinie der OSM Foundation
+   untersagt „systematic queries“ und Auto-Complete ausdrücklich, begrenzt auf
+   eine Anfrage je Sekunde und verlangt für ernsthaften Bedarf einen eigenen
+   Dienst. Eine Prüfung bei jeder Sendung ist genau dieser Fall.
+
+**Quelle und Lizenz.** GeoNames-Postleitzahlen unter CC BY 4.0, abgeleitet mit
+`werkzeuge/plz-tabelle.py` zu 9.041 Einträgen (186 KB). Die Namensnennung steht
+in `web/daten/LIZENZ-plz.txt` und in der Fußzeile der Anwendung.
+
+**Grenzen, die benannt sein wollen.**
+
+* Geprüft werden **Postleitzahl und Ort**, nicht Straße und Hausnummer. Eine
+  Straßenprüfung bräuchte einen um Größenordnungen größeren Datenbestand.
+* Großempfänger-Postleitzahlen sind ausgelassen, weil im Datensatz dort ein
+  Firmenname statt eines Ortes steht. Einzelne Dienststellen bleiben dennoch
+  übrig. Deshalb schlägt die Oberfläche einen Ort nur vor, wenn das Gelesene ein
+  **Anfang** des Tabellennamens ist oder gar kein Ort gelesen wurde – ein richtig
+  gelesener Ort wird nie überschrieben.
+* Bei **Widerspruch** wird gesagt, was nicht zusammenpasst, und nichts geändert:
+  es kann ebenso gut die Postleitzahl falsch gelesen sein.
+* Die Tabelle veraltet. Sie lässt sich mit einem Aufruf neu erzeugen; das gehört
+  in die Pflegeroutine der Einrichtung.
+
+**Zurückzunehmen, wenn.** Die Einrichtung einen **eigenen** Geokodierdienst
+betreibt und die Datenschutzfrage dafür geklärt ist. Dann träte er als zweite,
+abschaltbare Quelle daneben – nie als Voraussetzung.

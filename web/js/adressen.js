@@ -532,3 +532,22 @@ export function ohneAnkerbeschriftung(text) {
     .filter(Boolean)
     .join('\n');
 }
+
+/**
+ * Schreibt in einer Anschrift den Ort hinter der Postleitzahl neu.
+ *
+ * Für den Vorschlag der Plausibilitätsprüfung: „99423 WE“ wird zu
+ * „99423 Weimar“, alles andere bleibt Zeile für Zeile stehen.
+ */
+export function ersetzeOrt(text, ort) {
+  let getroffen = false;
+  const zeilen = tidy(text).map((zeile) => {
+    if (getroffen) return zeile;
+    const treffer = matchPostalLine(zeile);
+    if (!treffer) return zeile;
+    getroffen = true;
+    const vorsatz = /^(?:d|de)\s*-\s*/i.test(zeile) ? zeile.match(/^(?:d|de)\s*-\s*/i)[0] : '';
+    return `${vorsatz}${treffer.postalCode} ${ort}`;
+  });
+  return zeilen.join('\n');
+}

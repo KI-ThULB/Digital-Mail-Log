@@ -61,18 +61,22 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
 4. **Eigene Stelle antippen.** Über den Feldern der eigenen Seite stehen die
    gemerkten Stellen des Hauses. Ein Tipp füllt Name, Organisation, Anschrift und
    — beim Ausgang — das PSP-Element.
-5. **Gelbe Hinweise beachten.** Erscheint unter einer Anschrift ein gelber
+5. **Grüner Hinweis: „Erkanntes übernehmen“.** Steht in einem Feld schon etwas —
+   etwa weil Sie einen gespeicherten Eintrag berichtigen —, überschreibt die
+   Erkennung es **nicht**. Was sie gelesen hat, bietet sie darunter an. Ein Tipp
+   setzt es ein, sonst bleibt Ihre Eingabe stehen.
+6. **Gelbe Hinweise beachten.** Erscheint unter einer Anschrift ein gelber
    Balken — etwa *„Erkannt: ‚WE‘. Zur Postleitzahl 99423 gehört Weimar.“* —,
    dann hat die App den Ort anhand der Postleitzahl nachgeschlagen. Ein Tipp auf
    **„Weimar übernehmen“** setzt ihn ein. Steht dort ein Widerspruch, schauen
    Sie bitte auf den Umschlag: es kann auch die Postleitzahl falsch gelesen
    sein. Das Nachschlagen geschieht auf dem Gerät; es wird nichts abgefragt.
-6. **Vorschläge prüfen.** Falsches überschreiben, Fehlendes ergänzen. Was leer
+7. **Vorschläge prüfen.** Falsches überschreiben, Fehlendes ergänzen. Was leer
    blieb, war nicht lesbar — das ist in Ordnung. Fehlt eine Seite ganz, lässt sie
    sich mit **„nur diese Seite“** einzeln nachfotografieren.
-7. **Beschreibung und Sendungsart** eintragen.
-8. **Beim Ausgang:** Porto und, wenn nicht schon übernommen, das PSP-Element.
-9. **Speichern.** Die Maske steht sofort wieder bereit für die nächste Sendung.
+8. **Beschreibung und Sendungsart** eintragen.
+9. **Beim Ausgang:** Porto und, wenn nicht schon übernommen, das PSP-Element.
+10. **Speichern.** Die Maske steht sofort wieder bereit für die nächste Sendung.
 
 ### Die eigene Stelle einmal merken
 

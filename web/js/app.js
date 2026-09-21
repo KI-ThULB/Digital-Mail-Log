@@ -972,13 +972,20 @@ async function erkenneBereiche(blob, aufgabe, drehung = 0) {
       );
       const dauer = `${((Date.now() - begonnen) / 1000).toFixed(1)} s`;
       if (istBrauchbar(parsed, result, true)) {
-        fuelleSeite(seite, parsed);
+        const wirkung = fuelleSeite(seite, parsed);
         if (parsed.shipmentType && !$('art').value) $('art').value = parsed.shipmentType;
-        state.dirty = true;
-        meldungen.push(
-          `${ZIELWORT[seite]}: übernommen (${dauer}` +
-            `${gelesen.drehung ? `, um ${gelesen.drehung}° gedreht` : ''}).`,
-        );
+        if (wirkung.uebernommen) state.dirty = true;
+        const wie = `${dauer}${gelesen.drehung ? `, um ${gelesen.drehung}° gedreht` : ''}`;
+        if (wirkung.uebernommen) {
+          meldungen.push(`${ZIELWORT[seite]}: übernommen (${wie}).`);
+        } else if (wirkung.offen) {
+          meldungen.push(
+            `${ZIELWORT[seite]}: gelesen (${wie}), aber die Felder sind schon gefüllt – ` +
+              'die Übernahme wird unten angeboten.',
+          );
+        } else {
+          meldungen.push(`${ZIELWORT[seite]}: gelesen (${wie}), die Felder stimmen bereits.`);
+        }
       } else {
         meldungen.push(
           `${ZIELWORT[seite]}: nichts Sicheres gelesen (${dauer}) – bitte den Bereich ` +
@@ -1170,31 +1177,94 @@ async function runOcr(file, ziel = 'umschlag', crop = null, drehung = 0) {
     $('ocr-ergebnis').hidden = false;
     $('ocr-ergebnis').open = true;
 
-    const uebernommen = applySuggestion(gelesen, ziel, result);
+    const { etwas, offen } = applySuggestion(gelesen, ziel, result);
     const dauer = `${((Date.now() - started) / 1000).toFixed(1)} s`;
-    status.textContent = uebernommen
-      ? `Erkannt in ${dauer}. Bitte prüfen und bei Bedarf berichtigen.`
-      : `In ${dauer} gelesen, aber nichts Sicheres gefunden – nichts übernommen. ` +
+    if (etwas) {
+      status.textContent = `Erkannt in ${dauer}. Bitte prüfen und bei Bedarf berichtigen.`;
+    } else if (offen) {
+      // Gelesen, aber die Felder standen schon: das muss dastehen, sonst sucht
+      // man den Fehler bei der Erkennung, wo keiner ist.
+      status.textContent =
+        `In ${dauer} gelesen, aber die Felder sind schon gefüllt – ` +
+        'nichts überschrieben, die Übernahme wird unten angeboten.';
+    } else {
+      status.textContent =
+        `In ${dauer} gelesen, aber nichts Sicheres gefunden – nichts übernommen. ` +
         'Bitte näher an das Anschriftenfeld gehen, sodass es das Bild füllt, ' +
         'oder die Felder von Hand ausfüllen. Der erkannte Text steht unten.';
+    }
   } catch (error) {
     status.textContent = `Erkennung fehlgeschlagen: ${error.message}. Bitte von Hand ausfüllen.`;
   }
 }
 
-/** Füllt eine Seite aus einem Erkennungsergebnis, ohne Vorhandenes zu überschreiben. */
+const FELDNAME = { name: 'Name', org: 'Organisation', adresse: 'Anschrift' };
+
+/**
+ * Füllt eine Seite aus einem Erkennungsergebnis.
+ *
+ * Leere Felder werden gefüllt. Gefüllte werden **nicht** überschrieben – eine
+ * von Hand eingetragene Berichtigung darf nicht von einer neuen Aufnahme
+ * weggeräumt werden. Weicht das Erkannte ab, wird es ausdrücklich angeboten.
+ *
+ * Genau daran hing ein stiller Fehler: bei der Bearbeitung eines bereits
+ * gespeicherten Eintrags waren die Felder gefüllt, jede neue Erkennung lief
+ * folgenlos ins Leere – und die Meldung sagte trotzdem „übernommen“. Wer das
+ * sieht, sucht den Fehler bei der Erkennung, wo keiner ist.
+ *
+ * @returns {{uebernommen:boolean, offen:number}}
+ */
 function fuelleSeite(seite, quelle) {
-  const name = $(`${seite}-name`);
-  const organisation = $(`${seite}-org`);
-  const anschrift = $(`${seite}-adresse`);
-  if (quelle.person && !name.value) name.value = quelle.person;
-  if (quelle.organisation && !organisation.value) organisation.value = quelle.organisation;
-  // Früher wanderte die Organisation ersatzweise auch ins Namensfeld. Bei einer
-  // Sendung eines Vereins stand dann derselbe Text dreimal da. Ohne erkannte
-  // Person bleibt das Namensfeld leer – das ist die richtige Angabe.
-  if (quelle.address && !anschrift.value) anschrift.value = quelle.address;
+  const vorschlaege = [
+    ['name', quelle.person],
+    ['org', quelle.organisation],
+    ['adresse', quelle.address],
+  ].filter(([, wert]) => Boolean(wert && wert.trim()));
+
+  let uebernommen = false;
+  const abweichend = [];
+  for (const [kurz, wert] of vorschlaege) {
+    const feld = $(`${seite}-${kurz}`);
+    if (!feld.value.trim()) {
+      feld.value = wert;
+      uebernommen = true;
+    } else if (feld.value.trim() !== wert.trim()) {
+      abweichend.push({ kurz, wert });
+    }
+  }
+
+  zeigeUebernahme(seite, abweichend);
   suggestContacts(seite);
   pruefeSeite(seite);
+  return { uebernommen, offen: abweichend.length };
+}
+
+/** Bietet an, gefüllte Felder durch das Erkannte zu ersetzen. */
+function zeigeUebernahme(seite, abweichend) {
+  const bereich = $(`${seite}-uebernahme`);
+  if (!abweichend.length) {
+    bereich.hidden = true;
+    bereich.replaceChildren();
+    return;
+  }
+  const liste = abweichend.map(({ kurz, wert }) => `${FELDNAME[kurz]}: „${wert.replace(/\n/g, ' · ')}“`);
+  bereich.replaceChildren(
+    el('span', {
+      text: `Erkannt, aber das Feld ist schon gefüllt – ${liste.join('; ')}.`,
+    }),
+    el('button', {
+      type: 'button',
+      text: 'Erkanntes übernehmen',
+      onclick: () => {
+        for (const { kurz, wert } of abweichend) $(`${seite}-${kurz}`).value = wert;
+        state.dirty = true;
+        zeigeUebernahme(seite, []);
+        suggestContacts(seite);
+        pruefeSeite(seite);
+      },
+    }),
+  );
+  bereich.hidden = false;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1292,32 +1362,37 @@ function istBrauchbar(teil, erkennung, markiert = false) {
  */
 function applySuggestion(gelesen, ziel = 'umschlag', erkennung = { confidence: 1 }) {
   let etwas = false;
+  let offen = 0;
   if (ziel === 'umschlag') {
     if (istBrauchbar(gelesen.empfaenger, erkennung)) {
-      fuelleSeite('empfaenger', gelesen.empfaenger);
-      etwas = true;
+      const wirkung = fuelleSeite('empfaenger', gelesen.empfaenger);
+      etwas = etwas || wirkung.uebernommen;
+      offen += wirkung.offen;
     }
     if (istBrauchbar(gelesen.absender, erkennung)) {
-      fuelleSeite('absender', gelesen.absender);
-      etwas = true;
+      const wirkung = fuelleSeite('absender', gelesen.absender);
+      etwas = etwas || wirkung.uebernommen;
+      offen += wirkung.offen;
     } else if (!gelesen.ankerGefunden && gelesen.empfaenger.returnLine) {
       // Die Rücksendezeile des Fensterumschlags steht in einer Zeile. Ließ sie
       // sich nicht zerlegen, wandert sie unzerlegt in das Anschriftenfeld.
       const zeilen = gelesen.empfaenger.returnLine
         .replace(/\s*[·•]\s*/g, '\n')
         .replace(/\s+[-–]\s+/g, '\n');
-      fuelleSeite('absender', { address: zeilen });
-      etwas = true;
+      const wirkung = fuelleSeite('absender', { address: zeilen });
+      etwas = etwas || wirkung.uebernommen;
+      offen += wirkung.offen;
     }
   } else if (istBrauchbar(gelesen, erkennung)) {
-    fuelleSeite(ziel, gelesen);
-    etwas = true;
+    const wirkung = fuelleSeite(ziel, gelesen);
+    etwas = wirkung.uebernommen;
+    offen += wirkung.offen;
   }
 
   const art = ziel === 'umschlag' ? gelesen.empfaenger.shipmentType : gelesen.shipmentType;
   if (art && !$('art').value) $('art').value = art;
   if (etwas) state.dirty = true;
-  return etwas;
+  return { etwas, offen };
 }
 
 /* ------------------------------------------------------------------ *

@@ -140,6 +140,9 @@ function tidy(text) {
         .replace(/\s+/g, ' ')
         .replace(/^[^\p{L}\p{N}]+/u, '')
         .replace(/[^\p{L}\p{N}.\-)]+$/u, '')
+        // „99423 WEN .“ – ein alleinstehender Punkt am Ende gehört zum Rand,
+        // nicht zum Ort. „e.V.“ bleibt unberührt, dort klebt der Punkt am Wort.
+        .replace(/\s+\.$/u, '')
         .trim(),
     )
     .filter(Boolean);

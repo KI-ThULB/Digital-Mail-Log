@@ -365,3 +365,28 @@ test('Satzzeichen an den Zeilenrändern, Bedeutungstragendes bleibt', () => {
   assert.ok(!parsed.address.includes('~'));
   assert.ok(!parsed.address.includes('|'));
 });
+
+test('Rücksendezeile eines Umschlags, mit Trennstrichen gelesen', () => {
+  // So stand es an einem echten Umschlag, quer am oberen Rand gedruckt; die
+  // Erkennung liest die Trenner als „|“. Die Angaben sind hier erfunden.
+  const parsed = parseAddress('Musterrat Sachsen e.V. | Beispielstraße 4 | 01067 DRE .');
+  assert.equal(parsed.organisation, 'Musterrat Sachsen e.V.');
+  assert.equal(parsed.street, 'Beispielstraße 4');
+  assert.equal(parsed.postalCode, '01067');
+  assert.equal(parsed.city, 'DRE', 'der alleinstehende Punkt gehört zum Papierrand');
+});
+
+test('Buchstabensalat um eine gute Zeile herum wird verworfen', () => {
+  const parsed = parseAddress(
+    [
+      'un EN',
+      '7 Be An ZN A ) di | A M | 8',
+      'A ME X a',
+      'Musterrat Sachsen e.V. | Beispielstraße 4 | 01067 DRE .',
+      'MG MAUS',
+    ].join('\n'),
+  );
+  assert.equal(parsed.organisation, 'Musterrat Sachsen e.V.');
+  assert.equal(parsed.street, 'Beispielstraße 4');
+  assert.equal(parsed.address, 'Musterrat Sachsen e.V.\nBeispielstraße 4\n01067 DRE');
+});

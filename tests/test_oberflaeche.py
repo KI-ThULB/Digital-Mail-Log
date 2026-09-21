@@ -659,6 +659,47 @@ class BrowserFlow(unittest.TestCase):
         self.assertIn("Jena", page.text_content("#absender-pruefung"))
         self.assertIn("07743 Erfurt", page.input_value("#absender-adresse"))
 
+    @unittest.skipUnless(
+        TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
+    )
+    def test_gefuellte_felder_werden_nicht_stillschweigend_uebergangen(self):
+        """Der stille Fehler: bei einem gefüllten Feld lief die Erkennung ins Leere.
+
+        Bei der Bearbeitung eines gespeicherten Eintrags sind die Felder gefüllt.
+        Eine neue Erkennung überschreibt sie nicht — zu Recht, sonst wäre jede
+        Berichtigung von Hand verloren. Nur sagte die Meldung trotzdem
+        „übernommen“. Wer das sieht, sucht den Fehler bei der Erkennung, wo
+        keiner ist.
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            image = _envelope_png(Path(folder) / "umschlag.png")
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+
+            # Wie bei einem gespeicherten Eintrag: die Felder stehen schon.
+            page.fill("#absender-org", "Von Hand eingetragen")
+            page.fill("#absender-adresse", "Von Hand eingetragen 1\n00000 Musterstadt")
+            page.set_input_files("#foto-absender", str(image))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+            page.click("#zuschnitt-ganz")
+            page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
+
+            # Das Eingetragene bleibt stehen …
+            self.assertEqual(page.input_value("#absender-org"), "Von Hand eingetragen")
+            self.assertIn("Musterstadt", page.input_value("#absender-adresse"))
+            # … die Meldung sagt es …
+            self.assertIn("schon gefüllt", page.text_content("#ocr-status"))
+            # … und das Erkannte wird ausdrücklich angeboten.
+            page.wait_for_selector("#absender-uebernahme:not([hidden])")
+            angebot = page.text_content("#absender-uebernahme")
+            self.assertIn("Landesbibliothek", angebot)
+
+            page.click("#absender-uebernahme button")
+            self.assertIn("Landesbibliothek", page.input_value("#absender-org"))
+            page.wait_for_selector("#absender-uebernahme", state="hidden")
+
     def test_interne_stelle_per_schnellwahl(self):
         page = self.page
         page.goto(self.base)

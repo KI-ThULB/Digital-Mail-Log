@@ -10,9 +10,9 @@ Stand 21.09.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 39 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 13 | bestanden |
-| **Summe** | **140** | **bestanden** |
+| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 41 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 14 | bestanden |
+| **Summe** | **143** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -92,6 +92,17 @@ jeder Bereich einzeln erkannt. Die Angaben landen auf der Seite, die markiert
 wurde — nicht auf der anderen —, mitmarkierte Beschriftungen („Empfänger:“)
 landen in keinem Feld, und der Statustext benennt jede Seite einzeln. Geprüft ist
 damit auch die Umrechnung von Anteilen in Bildpunkte.
+
+**Gefüllte Felder.** Eine neue Erkennung überschreibt nichts, was schon dasteht
+— eine Berichtigung von Hand darf nicht verloren gehen. Sie sagt es jetzt aber
+und bietet die Übernahme an. Vorher meldete sie „übernommen“, während nichts
+geschah; bei der Bearbeitung eines gespeicherten Eintrags lief damit jede
+Erkennung folgenlos ins Leere.
+
+**Rücksendezeile mit Trennern.** Die einzeilige Absenderangabe am oberen
+Umschlagrand („Verein e.V. | Straße 4 | 01067 DRE .“) wird zerlegt, der
+Buchstabensalat ringsum verworfen und ein alleinstehender Punkt am Zeilenende
+als Papierrand erkannt.
 
 **Schmale Streifen.** Ein bewusst schmal gezogener Rahmen — die Form eines quer
 gedruckten Absenders am Rand — bleibt schmal; ein Antippen setzt weiterhin einen
@@ -210,19 +221,27 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     `createImageBitmap` folgt ihr nicht überall; ein quer aufgenommenes
     Telefonfoto war damit für die Erkennung praktisch unlesbar. Behoben: das Bild
     wird über ein `<img>`-Element geladen.
-13. **Ein schmal gezogener Rahmen wurde verworfen.** Unterschritt **eine** Kante
+13. **„Übernommen“, obwohl nichts übernommen wurde.** Gefüllte Felder werden von
+    einer neuen Erkennung nicht überschrieben — richtig so, sonst wäre jede
+    Berichtigung von Hand weg. Die Meldung sagte trotzdem „übernommen“. Bei der
+    Bearbeitung eines gespeicherten Eintrags lief damit jede Erkennung folgenlos
+    ins Leere, und der Fehler wurde bei der Erkennung gesucht, wo keiner war.
+    Behoben: die Meldung benennt es, und das Erkannte wird zur Übernahme
+    angeboten. **Nur am echten Bildschirm sichtbar geworden**, nicht in den
+    Tests — dort war das Formular immer leer.
+14. **Ein schmal gezogener Rahmen wurde verworfen.** Unterschritt **eine** Kante
     acht Prozent, galt der Zug als Antippen und wurde durch den großen
     Vorgaberahmen ersetzt — genau die Form eines quer gedruckten Absenders.
     Erkannt wurde dann der halbe Umschlag. Behoben: als Antippen gilt nur, was
     in **beiden** Richtungen unter zwei Prozent bleibt; dazu ein
     Sicherheitsrand um jeden markierten Bereich, weil ein um ein Prozent zu
     schmaler Rahmen die Buchstaben längs anschneidet.
-14. **Ein hohes Foto ragte aus dem Bildschirm.** Über der Markierfläche ist
+15. **Ein hohes Foto ragte aus dem Bildschirm.** Über der Markierfläche ist
     Scrollen abgeschaltet — sonst ließe sich nicht markieren —, also war der
     obere Teil einer hochformatigen Sendung schlicht unerreichbar. Behoben: das
     Bild wird auf Fensterhöhe begrenzt. Aufgefallen im eigenen Prüflauf am
     echten Foto, nicht in den Tests: dort war das Prüfbild klein genug.
-15. **Die Suchdrehung verschob den markierten Bereich.** Sie wurde auf das ganze
+16. **Die Suchdrehung verschob den markierten Bereich.** Sie wurde auf das ganze
     Bild angewandt und der Ausschnitt danach genommen — bei jeder Drehung lag der
     markierte Bereich damit woanders auf der Sendung. Gelesen wurde mit 84 %
     Zuversicht, und es fehlte der halbe Adressblock. Behoben: erst schneiden,

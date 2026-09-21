@@ -262,3 +262,34 @@ acht Rechtecke je Sendung. Im Takt einer Poststelle ist das zu langsam.
 Sendung mehr kosten als das Berichtigen. Dann wird erst automatisch versucht und
 nur bei unsicherem Ergebnis zum Markieren aufgefordert — die Technik dafür liegt
 bereits vollständig vor, es wäre eine Änderung im Ablauf, nicht im Kern.
+
+---
+
+## E12 · Am Arbeitsplatz zusätzlich die angeschlossene Kamera (21.09.2026)
+
+**Entscheidung.** Neben dem Dateifeld mit `capture` gibt es einen zweiten
+Aufnahmeweg über `getUserMedia`: Live-Bild, Geräteauswahl, Einzelbild abnehmen.
+Der Knopf erscheint **nur**, wo der Browser den Zugriff kennt und der Kontext
+sicher ist. Auf dem Telefon bleibt alles, wie es war.
+
+**Begründung.** E01 hatte `getUserMedia` verworfen — zu Recht, für iOS im
+Startbildschirm. Für den Arbeitsplatzrechner gilt das Argument nicht, und dort
+steht ein Weg offen, den das Telefon nicht hat: eine feste Kamera über dem
+Sortiertisch, ein iPhone über Continuity, eine Webcam. Sendung hinlegen,
+abnehmen, Bereiche mit der Maus markieren — die Hände bleiben bei der Post,
+statt ein Telefon zu halten. Für eine Poststelle könnte das der eigentliche
+Arbeitsplatz sein; das Telefon ist dann für die Ausnahme da, nicht für den Takt.
+
+**Der Kontext.** Kamerazugriff verlangt einen sicheren Kontext. `127.0.0.1` gilt
+im Browser als sicher, auch ohne TLS — deshalb funktioniert der Weg schon beim
+örtlichen Ausprobieren. Im Betrieb liegt die Anwendung ohnehin hinter TLS. Auf
+einer Adresse wie `http://192.168.178.43:8000/` erscheint der Knopf **nicht**,
+und das ist richtig so: dort wäre der Zugriff auch nicht erlaubt.
+
+**Preis.** Ein zweiter Aufnahmeweg, der gepflegt werden will. Beide münden nach
+wenigen Zeilen in denselben Ablauf — Markieren, Erkennen, Prüfen —, deshalb
+bleibt der Zusatz klein.
+
+**Offen.** Ob ein fester Kameraarbeitsplatz schneller ist als das Telefon in der
+Hand, ist nicht gemessen. Der Pilotbetrieb kann beides mitführen: derselbe Weg
+`E` im Messprotokoll, mit einer Bemerkung, womit aufgenommen wurde.

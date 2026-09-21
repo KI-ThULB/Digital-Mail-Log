@@ -859,6 +859,130 @@ async function erkenneBereiche(blob, aufgabe) {
   status.textContent = `${meldungen.join(' ')} Bitte prüfen und bei Bedarf berichtigen.`;
 }
 
+/* ------------------------------------------------------------------ *
+ * Angeschlossene Kamera
+ *
+ * Auf dem Telefon bleibt es beim Dateifeld mit ``capture``: der Zugriff über
+ * ``getUserMedia`` gilt auf dem iOS-Startbildschirm als unzuverlässig. Am
+ * Arbeitsplatzrechner gilt dieses Argument nicht, und dort steht ein Weg offen,
+ * den das Telefon nicht hat: eine angeschlossene Kamera – ein iPhone über
+ * Continuity, eine Webcam, eine Kamera über dem Sortiertisch. Die Hände bleiben
+ * dann bei der Post, statt ein Telefon zu halten.
+ *
+ * ``http://127.0.0.1:8000/`` zählt im Browser als sicherer Kontext, obwohl kein
+ * TLS im Spiel ist. Deshalb funktioniert der Kamerazugriff auch beim örtlichen
+ * Ausprobieren; im Betrieb liegt die App ohnehin hinter TLS.
+ * ------------------------------------------------------------------ */
+
+const kamera = { stream: null, geraet: '' };
+
+/** Kamerazugriff gibt es nur im sicheren Kontext und nur, wo der Browser ihn kennt. */
+function kameraMoeglich() {
+  return Boolean(window.isSecureContext && navigator.mediaDevices?.getUserMedia);
+}
+
+async function kameraListe() {
+  const auswahl = $('kamera-geraet');
+  const geraete = (await navigator.mediaDevices.enumerateDevices()).filter(
+    (g) => g.kind === 'videoinput',
+  );
+  auswahl.replaceChildren(
+    ...geraete.map((g, i) =>
+      el('option', { value: g.deviceId, text: g.label || `Kamera ${i + 1}` }),
+    ),
+  );
+  auswahl.hidden = geraete.length < 2;
+  if (kamera.geraet) auswahl.value = kamera.geraet;
+  return geraete;
+}
+
+async function kameraStarten(geraet = '') {
+  kameraStoppen();
+  const wunsch = geraet
+    ? { deviceId: { exact: geraet } }
+    : { facingMode: { ideal: 'environment' } };
+  kamera.stream = await navigator.mediaDevices.getUserMedia({
+    // Möglichst hoch auflösend: der Ausschnitt wird später klein, und je mehr
+    // Bildpunkte auf der Anschrift liegen, desto besser liest die Erkennung.
+    video: { ...wunsch, width: { ideal: 2560 }, height: { ideal: 1440 } },
+    audio: false,
+  });
+  kamera.geraet = geraet;
+  const bild = $('kamera-bild');
+  bild.srcObject = kamera.stream;
+  await bild.play().catch(() => {});
+}
+
+function kameraStoppen() {
+  for (const spur of kamera.stream?.getTracks() || []) spur.stop();
+  kamera.stream = null;
+  $('kamera-bild').srcObject = null;
+}
+
+function kameraSchliessen() {
+  kameraStoppen();
+  $('kamera').hidden = true;
+}
+
+async function kameraOeffnen() {
+  const stand = $('kamera-stand');
+  $('kamera').hidden = false;
+  stand.textContent = 'Kamera wird geöffnet …';
+  try {
+    await kameraStarten(kamera.geraet);
+    // Die Namen der Geräte nennt der Browser erst, wenn der Zugriff erlaubt ist.
+    const geraete = await kameraListe();
+    stand.textContent = geraete.length
+      ? 'Sendung ins Bild halten und aufnehmen.'
+      : 'Keine Kamera gefunden.';
+  } catch (error) {
+    kameraStoppen();
+    stand.textContent =
+      error.name === 'NotAllowedError'
+        ? 'Der Kamerazugriff wurde abgelehnt. Im Browser erlauben oder den Umschlag fotografieren.'
+        : `Kamera nicht verfügbar: ${error.message}`;
+  }
+}
+
+/** Nimmt das aktuelle Bild ab und übergibt es dem Markieren. */
+async function kameraAufnehmen() {
+  const bild = $('kamera-bild');
+  if (!kamera.stream || !bild.videoWidth) return;
+  const leinwand = document.createElement('canvas');
+  leinwand.width = bild.videoWidth;
+  leinwand.height = bild.videoHeight;
+  leinwand.getContext('2d').drawImage(bild, 0, 0);
+  const blob = await new Promise((fertig) => leinwand.toBlob(fertig, 'image/png'));
+  kameraSchliessen();
+  if (blob) await zeigeZuschnitt(blob, 'umschlag');
+}
+
+function wireKamera() {
+  const knopf = $('kamera-oeffnen');
+  if (!kameraMoeglich()) return;
+  knopf.hidden = false;
+  knopf.addEventListener('click', kameraOeffnen);
+  $('kamera-aufnehmen').addEventListener('click', kameraAufnehmen);
+  $('kamera-schliessen').addEventListener('click', () => {
+    kameraSchliessen();
+    $('ocr-status').textContent = 'Kamera geschlossen.';
+  });
+  $('kamera-geraet').addEventListener('change', async (event) => {
+    try {
+      await kameraStarten(event.target.value);
+      $('kamera-stand').textContent = 'Sendung ins Bild halten und aufnehmen.';
+    } catch (error) {
+      $('kamera-stand').textContent = `Kamera nicht verfügbar: ${error.message}`;
+    }
+  });
+  // Eine offene Kamera in einer verlassenen Ansicht ist ein Ärgernis: das
+  // Lämpchen brennt weiter. Deshalb beim Wechsel der Ansicht schließen.
+  for (const knopfZurueck of document.querySelectorAll('[data-zurueck]')) {
+    knopfZurueck.addEventListener('click', kameraSchliessen);
+  }
+  window.addEventListener('pagehide', kameraStoppen);
+}
+
 async function runOcr(file, ziel = 'umschlag', crop = null) {
   const status = $('ocr-status');
   const started = Date.now();
@@ -1306,6 +1430,7 @@ function wire() {
 async function start() {
   wire();
   wireZuschnitt();
+  wireKamera();
   renderConnection();
   state.form = blankForm();
 

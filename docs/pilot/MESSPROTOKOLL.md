@@ -39,6 +39,11 @@ Jede Sendung wird auf **einem** von zwei Wegen erfasst:
   bitte notieren Sie auffällige Fälle, in denen das Markieren gehakt hat.
 - **T** — nur tippen: Felder von Hand ausfüllen.
 
+Wird am Arbeitsplatzrechner mit angeschlossener Kamera aufgenommen statt mit dem
+Telefon, bleibt es der Weg `E`; bitte in der Bemerkungsspalte „Kamera“ notieren.
+Ob ein fester Kameraarbeitsplatz schneller ist als das Telefon in der Hand, ist
+eine offene Frage (E12) — sie lässt sich nur so beantworten.
+
 **Abwechselnd**, Sendung für Sendung. Nicht erst fünfzig auf einem Weg, dann
 fünfzig auf dem anderen: Übung und Ermüdung würden sonst als Unterschied
 zwischen den Wegen erscheinen. Bei zwei erfassenden Personen tauschen beide nach

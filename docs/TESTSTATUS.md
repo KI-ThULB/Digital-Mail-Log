@@ -11,8 +11,8 @@ Stand 21.09.2026.
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
 | Adressparser und Portokorpus (`tests/js/`) | 26 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 9 | bestanden |
-| **Summe** | **123** | **bestanden** |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 10 | bestanden |
+| **Summe** | **124** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -93,6 +93,12 @@ wurde — nicht auf der anderen —, mitmarkierte Beschriftungen („Empfänger:
 landen in keinem Feld, und der Statustext benennt jede Seite einzeln. Geprüft ist
 damit auch die Umrechnung von Anteilen in Bildpunkte.
 
+**Angeschlossene Kamera.** Mit einer erzeugten Kamera von Chromium: Kamera
+öffnen, Bild abnehmen, Markieren steht mit diesem Bild bereit, und die Kamera
+ist danach wieder frei — das Lämpchen brennt nicht weiter. Mitgeprüft ist, dass
+`127.0.0.1` im Browser als sicherer Kontext gilt; nur deshalb ist der Zugriff
+ohne TLS überhaupt möglich.
+
 **Texterkennung, örtlich.** Auf einem erzeugten Prüfumschlag: Tesseract mit
 deutschen Sprachdaten, vollständig im Browser, **1,4 Sekunden**, Zuversicht 90 %.
 Die Adressfelder wurden richtig befüllt, die Absenderzeile des Fensterumschlags
@@ -117,6 +123,11 @@ Bauumgebung beurteilen:
 * **Dauer auf den tatsächlichen Geräten.** 1,4 Sekunden auf einem
   Entwicklungsrechner sagen nichts über ein vier Jahre altes iPad.
 * **Kamera, Akku, Erwärmung** über einen Vormittag.
+* **Die angeschlossene Kamera an echter Hardware.** Geprüft ist die Kette mit
+  einem erzeugten Bild. Ob ein iPhone über Continuity, eine Webcam oder eine
+  Kamera über dem Sortiertisch scharf genug und hell genug abbildet — und ob
+  ein solcher Arbeitsplatz schneller ist als das Telefon in der Hand —, muss der
+  Pilotbetrieb zeigen.
 * **iOS im Startbildschirm.** Der Kamerazugriff über `getUserMedia` gilt dort
   als unzuverlässig. Die App vermeidet ihn und verwendet das Dateifeld mit
   `capture`; ob das auf den Geräten der ThULB durchgängig trägt, ist dort zu

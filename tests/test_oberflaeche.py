@@ -157,7 +157,14 @@ class BrowserFlow(unittest.TestCase):
         cls.base = f"http://127.0.0.1:{cls.port}/"
 
         cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch()
+        cls.browser = cls.playwright.chromium.launch(
+            args=[
+                # Erlaubt den Kameraweg im Test ohne echte Kamera: Chromium
+                # liefert ein erzeugtes Bild und fragt nicht nach Erlaubnis.
+                "--use-fake-ui-for-media-stream",
+                "--use-fake-device-for-media-stream",
+            ]
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -169,7 +176,7 @@ class BrowserFlow(unittest.TestCase):
 
     def setUp(self):
         self.context = self.browser.new_context(
-            viewport={"width": 414, "height": 896}, locale="de-DE"
+            viewport={"width": 414, "height": 896}, locale="de-DE", permissions=["camera"]
         )
         self.page = self.context.new_page()
         self.errors = []
@@ -383,6 +390,49 @@ class BrowserFlow(unittest.TestCase):
 
             for fremd in ("Referenz", "Gewicht", "gemeldet", "Musterfracht", "0207"):
                 self.assertNotIn(fremd, empfaenger + absender, f"{fremd} gehört in kein Adressfeld")
+
+    def test_angeschlossene_kamera_liefert_ein_bild_zum_markieren(self):
+        """Der zweite Aufnahmeweg für den Arbeitsplatzrechner.
+
+        Geprüft wird die Kette: Kamera öffnen, Bild abnehmen, Markieren steht
+        bereit — und dass die Kamera danach wieder frei ist. Die Erkennung
+        selbst bleibt außen vor; das erzeugte Prüfbild von Chromium trägt keinen
+        Text. Der Server wird über 127.0.0.1 angesprochen, was im Browser als
+        sicherer Kontext gilt — genau deshalb ist der Kamerazugriff ohne TLS
+        überhaupt möglich.
+        """
+        page = self.page
+        page.goto(self.base)
+        page.wait_for_selector("#kennung:not(:empty)")
+        self.assertTrue(page.evaluate("() => window.isSecureContext"))
+        page.click("#neu")
+
+        page.wait_for_selector("#kamera-oeffnen:not([hidden])")
+        page.click("#kamera-oeffnen")
+        page.wait_for_selector("#kamera:not([hidden])")
+        page.wait_for_function("() => document.getElementById('kamera-bild').videoWidth > 0")
+
+        page.click("#kamera-aufnehmen")
+        page.wait_for_selector("#zuschnitt:not([hidden])")
+        self.assertTrue(page.is_hidden("#kamera"), "Die Kamera schließt nach der Aufnahme")
+        self.assertFalse(
+            page.evaluate("() => Boolean(document.getElementById('kamera-bild').srcObject)"),
+            "Das Lämpchen darf nicht weiterbrennen",
+        )
+
+        # Das abgenommene Bild steht als Vorlage zum Markieren bereit.
+        masse = page.evaluate(
+            """() => {
+                const l = document.getElementById('zuschnitt-bild');
+                return { b: l.width, h: l.height };
+            }"""
+        )
+        self.assertGreater(masse["b"], 0)
+        self.assertGreater(masse["h"], 0)
+
+        # Und der gewohnte Weg funktioniert weiter.
+        self._markiere("empfaenger", 0.1, 0.1, 0.9, 0.6)
+        self.assertFalse(page.is_disabled("#zuschnitt-erkennen"))
 
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."

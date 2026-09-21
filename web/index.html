@@ -107,9 +107,32 @@
                 <input id="foto-erkennung" type="file" accept="image/*" capture="environment" />
                 <span>📷 Umschlag fotografieren</span>
               </label>
+              <button type="button" id="kamera-oeffnen" class="capture__kamera" hidden>
+                📹 Angeschlossene Kamera
+              </button>
               <p id="ocr-status" class="hint" role="status" aria-live="polite">
                 Texterkennung wird geprüft …
               </p>
+            </div>
+            <div id="kamera" class="kamera" hidden>
+              <p class="hint">
+                Für den Arbeitsplatzrechner: eine angeschlossene Kamera – ein iPhone über
+                Continuity, eine Webcam oder eine Kamera über dem Sortiertisch. Sendung ins Bild
+                halten, aufnehmen, dann wie gewohnt die Bereiche markieren.
+              </p>
+              <label class="field">
+                <span>Kamera</span>
+                <select id="kamera-geraet"></select>
+              </label>
+              <div class="kamera__buehne">
+                <!-- muted und playsinline: sonst verweigern Browser die Wiedergabe. -->
+                <video id="kamera-bild" class="kamera__bild" autoplay playsinline muted></video>
+              </div>
+              <p id="kamera-stand" class="hint" role="status" aria-live="polite"></p>
+              <div class="zuschnitt__aktionen">
+                <button type="button" id="kamera-aufnehmen" class="primary">Aufnehmen</button>
+                <button type="button" id="kamera-schliessen">Schließen</button>
+              </div>
             </div>
             <div id="zuschnitt" class="zuschnitt" hidden>
               <p class="hint">

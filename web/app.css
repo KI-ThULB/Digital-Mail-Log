@@ -558,3 +558,11 @@ button.chip.is-active {
   border-color: var(--gruen);
 }
 @media (prefers-color-scheme: dark) { button.chip.is-active { color: #06100f; } }
+
+/* ---------- Angeschlossene Kamera ---------- */
+
+.capture__kamera { background: transparent; border: 1px solid var(--linie); padding: 0 16px; }
+.kamera { margin-top: 12px; }
+.kamera .field { max-width: 320px; margin-top: 8px; }
+.kamera__buehne { margin-top: 8px; background: #000; line-height: 0; border-radius: 10px; overflow: hidden; }
+.kamera__bild { display: block; width: 100%; max-height: 60vh; object-fit: contain; }

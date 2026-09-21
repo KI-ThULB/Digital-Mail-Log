@@ -27,6 +27,12 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
    welche Felder erscheinen.
 2. **Umschlag fotografieren.** Die Kamera geht auf, Sie halten die Sendung so,
    dass das ganze Anschriftenfeld das Bild füllt.
+
+   *Am Arbeitsplatzrechner:* Steht dort eine Kamera — eine Webcam, ein iPhone am
+   Kabel oder eine Kamera über dem Sortiertisch —, geht es auch über
+   **„📹 Angeschlossene Kamera“**: Sendung hinlegen, **„Aufnehmen“**. Die Hände
+   bleiben bei der Post. Erscheint der Knopf nicht, gibt es an diesem Gerät keine
+   verwendbare Kamera; dann bitte fotografieren.
 3. **Bereiche markieren.** Oben die Seite wählen — **„Empfänger markieren“**
    oder **„Absender markieren“** —, dann mit dem Finger ein Rechteck über die
    Anschrift ziehen. Ein einfacher Tipp setzt einen Rahmen in Standardgröße; er

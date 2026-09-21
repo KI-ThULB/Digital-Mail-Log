@@ -116,6 +116,11 @@ verschiedene Wege.
 
 ### Der Weg vom Bild zum Feld
 
+0. **Aufnehmen.** Auf dem Telefon über das Dateifeld mit `capture`, das die
+   Kamera des Geräts öffnet. Am Arbeitsplatzrechner wahlweise über eine
+   angeschlossene Kamera (`getUserMedia`): iPhone über Continuity, Webcam,
+   Kamera über dem Sortiertisch. Der zweite Weg erscheint nur im sicheren
+   Kontext — wozu auch `127.0.0.1` zählt. Siehe E12.
 1. **Markieren.** Die erfassende Person zieht je ein Rechteck über die Anschrift
    des Empfängers und des Absenders und benennt damit die Seite. Erkannt wird nur
    der markierte Ausschnitt (`crop` als Anteile des Bildes, also unabhängig von

@@ -17,7 +17,9 @@ from __future__ import annotations
 import argparse
 import mimetypes
 import os
+import re
 import socket
+import subprocess
 from pathlib import Path
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 
@@ -78,16 +80,90 @@ class _Handler(WSGIRequestHandler):
         print(f"{self.address_string()} {fmt % args}")
 
 
+# Schnittstellen, die kein erreichbares lokales Netz sind: Tunnel aller Art.
+_TUNNEL = ("utun", "tun", "tap", "ppp", "ipsec", "gpd", "wg", "tailscale", "zt")
+# Schnittstellen, an denen ein Telefon im selben WLAN hängt.
+_FUNK = ("en", "wlan", "wl", "wifi", "eth")
+
+
+def schnittstellen_aus_text(text: str) -> list[tuple[str, str]]:
+    """Liest Name und IPv4-Adresse aus ``ifconfig`` oder ``ip -4 -o addr``.
+
+    Zwei Formate, ein Parser – beide nennen den Namen und dahinter ``inet``:
+
+        en0: flags=8863<UP,...>          ip: 3: en0    inet 192.168.178.43/24 ...
+            inet 192.168.178.43 netmask ...
+
+    Reine Textverarbeitung, damit sie sich ohne Netz und ohne Betriebssystem
+    prüfen lässt.
+    """
+    gefunden: list[tuple[str, str]] = []
+    name = ""
+    for zeile in text.splitlines():
+        # ip-Format: „3: en0    inet 10.0.0.5/24“ – Name und Adresse in einer Zeile.
+        treffer = re.match(r"^\d+:\s+(\S+?)\s+inet\s+(\d+\.\d+\.\d+\.\d+)", zeile)
+        if treffer:
+            gefunden.append((treffer.group(1), treffer.group(2)))
+            continue
+        # ifconfig-Format: Name am Zeilenanfang, Adresse in einer Folgezeile.
+        kopf = re.match(r"^(\S+?):\s", zeile)
+        if kopf and not zeile.startswith((" ", "\t")):
+            name = kopf.group(1)
+            continue
+        adresse = re.search(r"\binet\s+(\d+\.\d+\.\d+\.\d+)", zeile)
+        if adresse and name:
+            gefunden.append((name, adresse.group(1)))
+    return [(n, a) for n, a in gefunden if not a.startswith("127.")]
+
+
+def _schnittstellen() -> list[tuple[str, str]]:
+    """Fragt das Betriebssystem nach seinen Schnittstellen. Fehler sind erlaubt."""
+    for befehl in (["ip", "-4", "-o", "addr", "show"], ["ifconfig"], ["ifconfig", "-a"]):
+        try:
+            ergebnis = subprocess.run(befehl, capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if ergebnis.returncode == 0:
+            adressen = schnittstellen_aus_text(ergebnis.stdout)
+            if adressen:
+                return adressen
+    return []
+
+
+def _einordnung(name: str) -> str:
+    """Sagt in einem Halbsatz, wofür eine Adresse taugt."""
+    if name.startswith(_TUNNEL):
+        return "VPN oder Tunnel – vom Telefon aus nicht erreichbar"
+    if name.startswith(_FUNK):
+        return "lokales Netz – diese Adresse am Telefon verwenden"
+    return "unklar"
+
+
 def _local_addresses(port: int) -> list[str]:
-    names = {"127.0.0.1"}
-    try:
-        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        probe.connect(("192.0.2.1", 1))  # TEST-NET-1, es fließen keine Daten
-        names.add(probe.getsockname()[0])
-        probe.close()
-    except OSError:
-        pass
-    return [f"http://{name}:{port}/" for name in sorted(names)]
+    """Alle Adressen, unter denen der Server zu erreichen sein könnte.
+
+    Absichtlich vollständig und beschriftet. Die frühere Fassung nannte nur die
+    Adresse der Standardroute – bei aktivem VPN ist das die Tunneladresse, und
+    genau die ist vom Telefon im WLAN nicht erreichbar. Wer sie abtippt, sucht
+    den Fehler an der falschen Stelle.
+    """
+    zeilen = [f"http://127.0.0.1:{port}/ (nur dieser Rechner)"]
+    schnittstellen = _schnittstellen()
+    if not schnittstellen:
+        try:
+            probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            probe.connect(("192.0.2.1", 1))  # TEST-NET-1, es fließen keine Daten
+            schnittstellen = [("", probe.getsockname()[0])]
+            probe.close()
+        except OSError:
+            pass
+    # Erst das lokale Netz, dann alles andere: oben steht, was gebraucht wird.
+    for name, adresse in sorted(
+        schnittstellen, key=lambda e: (not e[0].startswith(_FUNK), e[0], e[1])
+    ):
+        beschriftung = f" ({name}, {_einordnung(name)})" if name else ""
+        zeilen.append(f"http://{adresse}:{port}/{beschriftung}")
+    return zeilen
 
 
 def main(argv=None) -> int:
@@ -117,6 +193,11 @@ def main(argv=None) -> int:
     print(f"  Kennung   : {args.benutzer} (Entwicklungsmodus, keine Anmeldung)")
     for url in _local_addresses(args.port) if args.host == "0.0.0.0" else [f"http://{args.host}:{args.port}/"]:
         print(f"  Adresse   : {url}")
+    if args.host == "0.0.0.0":
+        print(
+            "\n  Auf dem Telefon die Adresse des lokalen Netzes verwenden. Ein aktives VPN\n"
+            "  kann die Verbindung trotzdem verhindern: dann für den Test trennen."
+        )
     print("\n  Achtung: ohne TLS und ohne Anmeldung. Keine echten Postdaten erfassen.")
     print("  Beenden mit Strg+C\n")
     try:

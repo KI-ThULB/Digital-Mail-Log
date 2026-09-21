@@ -481,6 +481,11 @@ class BrowserFlow(unittest.TestCase):
             self.assertIn("Tiergartenstr", empfaenger)
             self.assertIn("07743", absender)
             self.assertIn("Bibliotheksplatz", absender)
+
+            # Ohne erkannte Person bleibt das Namensfeld leer. Früher wanderte
+            # die Organisation ersatzweise hinein und stand dann doppelt da.
+            self.assertEqual(page.input_value("#absender-name"), "")
+            self.assertIn("Landesbibliothek", page.input_value("#absender-org"))
             self.assertNotIn("07743", empfaenger, "Die Seiten dürfen nicht vermischt werden")
 
             # Die Beschriftung lag mit im Rechteck; sie gehört in kein Feld.
@@ -520,6 +525,16 @@ class BrowserFlow(unittest.TestCase):
                 " return l.height > l.width; }"
             )
             self.assertTrue(hoch, "Das Prüfbild muss quer liegen")
+
+            # Und es muss ganz auf den Bildschirm passen: über der Fläche ist
+            # Scrollen abgeschaltet, sonst ließe sich nicht markieren. Ragte das
+            # Bild darüber hinaus, wäre sein oberer Teil unerreichbar.
+            page.wait_for_timeout(300)
+            buehne = page.query_selector(".zuschnitt__buehne").bounding_box()
+            fenster = page.viewport_size["height"]
+            self.assertLessEqual(
+                buehne["height"], fenster, "Das Bild darf nicht höher als das Fenster sein"
+            )
 
             # Markieren, dann drehen: die Markierung muss mitwandern.
             self._markiere("empfaenger", 0.1, 0.1, 0.9, 0.5)

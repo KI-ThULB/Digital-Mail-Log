@@ -1139,7 +1139,9 @@ function fuelleSeite(seite, quelle) {
   const anschrift = $(`${seite}-adresse`);
   if (quelle.person && !name.value) name.value = quelle.person;
   if (quelle.organisation && !organisation.value) organisation.value = quelle.organisation;
-  if (!name.value && quelle.organisation) name.value = quelle.organisation;
+  // Früher wanderte die Organisation ersatzweise auch ins Namensfeld. Bei einer
+  // Sendung eines Vereins stand dann derselbe Text dreimal da. Ohne erkannte
+  // Person bleibt das Namensfeld leer – das ist die richtige Angabe.
   if (quelle.address && !anschrift.value) anschrift.value = quelle.address;
   suggestContacts(seite);
 }
@@ -1163,7 +1165,12 @@ function istBrauchbar(teil, erkennung, markiert = false) {
   // Ein markierter Bereich ist eine Aussage: „hier steht die Anschrift“. Dann
   // genügt ein Anker – Postleitzahl oder Straße –, um zu übernehmen. Ohne
   // Markierung muss das Ergebnis für sich eine Anschrift ergeben.
-  if (markiert) return Boolean(teil.postalCode || teil.street);
+  // Ein markierter Bereich muss keine vollständige Anschrift enthalten: auf
+  // vielen Umschlägen steht als Absender nur der Name des Hauses. Erkannt ist
+  // erkannt – unzuordenbare Zeilen hat der Parser ohnehin schon verworfen.
+  if (markiert) {
+    return Boolean(teil.postalCode || teil.street || teil.organisation || teil.person);
+  }
   return Boolean(teil.postalCode && (teil.street || teil.organisation || teil.person));
 }
 

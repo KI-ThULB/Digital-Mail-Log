@@ -10,9 +10,9 @@ Stand 21.09.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser und Portokorpus (`tests/js/`) | 29 | bestanden |
+| Adressparser und Portokorpus (`tests/js/`) | 31 | bestanden |
 | Oberfläche im Browser (`tests/test_oberflaeche.py`) | 11 | bestanden |
-| **Summe** | **128** | **bestanden** |
+| **Summe** | **130** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -92,6 +92,11 @@ jeder Bereich einzeln erkannt. Die Angaben landen auf der Seite, die markiert
 wurde — nicht auf der anderen —, mitmarkierte Beschriftungen („Empfänger:“)
 landen in keinem Feld, und der Statustext benennt jede Seite einzeln. Geprüft ist
 damit auch die Umrechnung von Anteilen in Bildpunkte.
+
+**Absender ohne Anschrift.** Steht als Absender nur der Name des Hauses — quer
+am Rand gedruckt, ohne Straße und Ort —, wird er übernommen statt verworfen.
+Ohne erkannte Person bleibt das Namensfeld leer; früher wanderte die
+Organisation ersatzweise hinein und stand dann dreifach da.
 
 **Quer liegende Sendungen.** Am gedrehten Prüfumschlag: „↻ Drehen“ richtet Bild
 **und** Markierungen auf (aus der Breite wird die Höhe), und ohne Zutun findet
@@ -188,7 +193,12 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     `createImageBitmap` folgt ihr nicht überall; ein quer aufgenommenes
     Telefonfoto war damit für die Erkennung praktisch unlesbar. Behoben: das Bild
     wird über ein `<img>`-Element geladen.
-13. **Die Suchdrehung verschob den markierten Bereich.** Sie wurde auf das ganze
+13. **Ein hohes Foto ragte aus dem Bildschirm.** Über der Markierfläche ist
+    Scrollen abgeschaltet — sonst ließe sich nicht markieren —, also war der
+    obere Teil einer hochformatigen Sendung schlicht unerreichbar. Behoben: das
+    Bild wird auf Fensterhöhe begrenzt. Aufgefallen im eigenen Prüflauf am
+    echten Foto, nicht in den Tests: dort war das Prüfbild klein genug.
+14. **Die Suchdrehung verschob den markierten Bereich.** Sie wurde auf das ganze
     Bild angewandt und der Ausschnitt danach genommen — bei jeder Drehung lag der
     markierte Bereich damit woanders auf der Sendung. Gelesen wurde mit 84 %
     Zuversicht, und es fehlte der halbe Adressblock. Behoben: erst schneiden,

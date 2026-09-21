@@ -131,9 +131,17 @@ function tidy(text) {
     .replace(/\r\n?/g, '\n')
     .replace(/[|¦]/g, '\n')
     .split('\n')
-    // Führende Satzzeichen stammen aus der Erkennung, nicht vom Umschlag: aus
-    // einem Rand wird gern ein „;“ oder „|“ vor der Straße.
-    .map((line) => line.replace(/\s+/g, ' ').replace(/^[^\p{L}\p{N}]+/u, '').trim())
+    // Satzzeichen an den Rändern stammen aus der Erkennung, nicht vom Umschlag:
+    // aus einem Papierrand wird gern ein „;“ vor der Straße oder ein „_“ hinter
+    // dem Namen. Punkt, Bindestrich und schließende Klammer bleiben stehen –
+    // „e.V.“ und „e.V.-“ (am Zeilenende fortgesetzt) sind bedeutungstragend.
+    .map((line) =>
+      line
+        .replace(/\s+/g, ' ')
+        .replace(/^[^\p{L}\p{N}]+/u, '')
+        .replace(/[^\p{L}\p{N}.\-)]+$/u, '')
+        .trim(),
+    )
     .filter(Boolean);
 }
 

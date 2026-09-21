@@ -320,7 +320,16 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--gruen); 
   line-height: 0;
   touch-action: none; /* sonst scrollt die Seite beim Ziehen */
 }
-.zuschnitt__bild { display: block; max-width: 100%; height: auto; }
+/* Das ganze Bild muss auf den Bildschirm passen. Über der Fläche ist Scrollen
+ * abgeschaltet (sonst ließe sich nicht markieren) – ragte das Bild darüber
+ * hinaus, wäre der obere Teil der Sendung schlicht nicht erreichbar. */
+.zuschnitt__bild {
+  display: block;
+  max-width: 100%;
+  max-height: 62vh;
+  width: auto;
+  height: auto;
+}
 
 .rollen { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .rolle { border: 1px solid var(--linie); background: transparent; }

@@ -344,3 +344,24 @@ test('Geschäftspost mit Verband, c/o und Anrede auf eigener Zeile', () => {
   // „Frau“ allein auf einer Zeile trägt nichts und gehört in kein Feld.
   assert.ok(!parsed.address.includes('Frau'));
 });
+
+test('Absender ohne Anschrift: nur der Name des Hauses', () => {
+  // Auf vielen Geschäftsumschlägen steht als Absender nur die Einrichtung,
+  // quer am Rand gedruckt. Der Papierrand hinterlässt dabei gern ein Zeichen.
+  const parsed = parseAddress('Musterrat Sachsen e.V. _');
+  assert.equal(parsed.organisation, 'Musterrat Sachsen e.V.');
+  assert.equal(parsed.address, 'Musterrat Sachsen e.V.');
+  assert.equal(parsed.person, '');
+  assert.equal(parsed.postalCode, '');
+});
+
+test('Satzzeichen an den Zeilenrändern, Bedeutungstragendes bleibt', () => {
+  const parsed = parseAddress(
+    ['| Musterverband e.V.-', 'Landesstelle Sachsen', '; Beispielweg 3', '01067 Dresden ~'].join('\n'),
+  );
+  assert.match(parsed.organisation, /Musterverband e\.V\.-/, 'Der Trennstrich ist Teil des Namens');
+  assert.equal(parsed.street, 'Beispielweg 3');
+  assert.equal(parsed.city, 'Dresden');
+  assert.ok(!parsed.address.includes('~'));
+  assert.ok(!parsed.address.includes('|'));
+});

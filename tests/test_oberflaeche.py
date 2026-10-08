@@ -48,24 +48,41 @@ def _free_port() -> int:
         return probe.getsockname()[1]
 
 
+def _schrift(size):
+    """Liefert eine Schrift in der verlangten Größe für die Prüfbilder.
+
+    Die Prüfbilder leben vom Größenunterschied: kleine Absenderzeile, großer
+    Empfängerblock. Früher standen hier nur Linux-Pfade. Auf dem Mac griff
+    deshalb die Ersatzschrift ohne Größenangabe, alles stand in rund zehn
+    Pixeln da, und die Erkennung las die Bilder nicht mehr so, wie die Tests
+    es voraussetzen.
+    """
+    from PIL import ImageFont
+
+    for name in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "C:/Windows/Fonts/arial.ttf",
+    ):
+        if Path(name).exists():
+            return ImageFont.truetype(name, size)
+    try:
+        return ImageFont.load_default(size)
+    except TypeError:  # Pillow vor 10.1 kennt keine Größe für die Ersatzschrift
+        return ImageFont.load_default()
+
+
 def _envelope_png(path: Path) -> Path:
     """Erzeugt einen erfundenen Briefumschlag als Prüfbild."""
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
 
     image = Image.new("RGB", (1000, 560), "white")
     draw = ImageDraw.Draw(image)
     draw.rectangle([4, 4, 996, 556], outline="#bbbbbb", width=3)
 
-    def font(size):
-        for name in (
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        ):
-            if Path(name).exists():
-                return ImageFont.truetype(name, size)
-        return ImageFont.load_default()
-
-    draw.text((70, 150), "Musterverlag GmbH · Hauptstr. 4 · 10115 Berlin", font=font(17), fill="#555555")
+    draw.text((70, 150), "Musterverlag GmbH · Hauptstr. 4 · 10115 Berlin", font=_schrift(17), fill="#555555")
     lines = [
         "Friedrich-Schiller-Universitaet Jena",
         "Thueringer Universitaets- und Landesbibliothek",
@@ -73,7 +90,7 @@ def _envelope_png(path: Path) -> Path:
         "07743 Jena",
     ]
     for index, line in enumerate(lines):
-        draw.text((70, 210 + index * 46), line, font=font(34), fill="black")
+        draw.text((70, 210 + index * 46), line, font=_schrift(34), fill="black")
     image.save(path)
     return path
 
@@ -94,20 +111,11 @@ def _parcel_label_png(path: Path) -> Path:
     Frachtführers und Zeichenfolgen, wie die Erkennung sie aus Strichcodes
     liest. Die Anschriften sind erfunden.
     """
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw
 
     image = Image.new("RGB", (1000, 1000), "white")
     draw = ImageDraw.Draw(image)
     draw.rectangle([6, 6, 994, 994], outline="black", width=4)
-
-    def font(size):
-        for name in (
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        ):
-            if Path(name).exists():
-                return ImageFont.truetype(name, size)
-        return ImageFont.load_default()
 
     zeilen = [
         (40, "Paketdienst Musterfracht GmbH", 26),
@@ -126,11 +134,11 @@ def _parcel_label_png(path: Path) -> Path:
         (680, "Schaeden muessen innerhalb von 7 Tagen gemeldet werden", 22),
     ]
     for y, text, groesse in zeilen:
-        draw.text((60, y), text, font=font(groesse), fill="black")
+        draw.text((60, y), text, font=_schrift(groesse), fill="black")
     # Ein Feld voller Strichcode-Rauschen, wie es unten auf Etiketten steht.
     for index in range(6):
         draw.text((60, 740 + index * 34), "J U 8 1 k %s Wl1N 0207" % ("|" * (index + 3)),
-                  font=font(24), fill="black")
+                  font=_schrift(24), fill="black")
     image.save(path)
     return path
 

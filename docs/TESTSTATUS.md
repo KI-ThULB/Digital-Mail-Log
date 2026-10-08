@@ -16,6 +16,8 @@ Stand 08.10.2026.
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
+Derselbe Umfang lief am 08.10.2026 auch auf macOS 26.5 mit Python 3.13.8 und
+Node 24.11.1 durch.
 
 ## Was dabei nachgewiesen wurde
 
@@ -287,3 +289,13 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     Komma oder notfalls vor der Postleitzahl und der Hausnummer aufgeteilt.
     „Abs.:“ am Anfang fällt weg. Erkannt an den Hinweisen der App im
     Bildschirmfoto.
+20. **Zwei Browsertests scheiterten auf dem Mac, nicht an der App.** Die
+    Prüfbilder für Umschlag und Paketetikett suchten ihre Schrift nur unter
+    Linux-Pfaden. Auf dem Mac griff die Ersatzschrift ohne Größenangabe, und
+    alle Zeilen standen in rund zehn Pixeln da. Damit fehlte der
+    Größenunterschied zwischen Absenderzeile und Empfängerblock, an dem die
+    Zuordnung hängt, und das Etikett wurde gar nicht mehr gelesen. Behoben im
+    Test: eine gemeinsame Schriftwahl kennt auch die Pfade von macOS und
+    Windows und gibt der Ersatzschrift die verlangte Größe mit. Am Code der
+    App hat sich nichts geändert. Erkannt beim vollständigen Testlauf auf dem
+    Entwicklungsrechner.

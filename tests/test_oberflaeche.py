@@ -659,6 +659,18 @@ class BrowserFlow(unittest.TestCase):
         self.assertIn("Jena", page.text_content("#absender-pruefung"))
         self.assertIn("07743 Erfurt", page.input_value("#absender-adresse"))
 
+        # Liegt die Zahl eine Ziffer daneben und passt so zum Ort, wird **sie**
+        # berichtigt, nicht der Ort: „87749 Jena“ → „07749 Jena“.
+        page.fill("#absender-adresse", "Herrn Max Muster\nLuise-Seidler-Straße 39\n87749 Jena")
+        page.wait_for_selector("#absender-pruefung:not([hidden])")
+        meldung = page.text_content("#absender-pruefung")
+        self.assertIn("07749", meldung)
+        self.assertIn("eine Ziffer", meldung)
+        page.click("#absender-pruefung button")
+        self.assertIn("07749 Jena", page.input_value("#absender-adresse"))
+        self.assertNotIn("Hawangen", page.input_value("#absender-adresse"))
+        page.wait_for_selector("#absender-pruefung", state="hidden")
+
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
     )

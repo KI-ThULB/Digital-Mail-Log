@@ -108,8 +108,58 @@ export function beurteileOrt(namen, gelesen) {
   return { status: 'widerspruch', vorschlag: liste[0] };
 }
 
-/** Prüft eine zerlegte Anschrift; ohne Tabelle oder ohne Postleitzahl stumm. */
+/**
+ * Sucht Postleitzahlen, die sich in **einer** Ziffer unterscheiden und zum
+ * gelesenen Ort passen.
+ *
+ * Anlass: ein Umschlag nach „Luise-Seidler-Straße 39, 07749 Jena“ wurde als
+ * „87749“ gelesen – die führende Null als Acht. Die Prüfung meldete daraufhin
+ * einen Widerspruch zu Jena und bot den Ort zu 87749 an, also ausgerechnet die
+ * falsche Richtung: der Ort war richtig, die Zahl falsch.
+ *
+ * Eine Ziffer ist der häufigste Lesefehler bei fünfstelligen Zahlen (0/8, 1/7,
+ * 3/8, 5/6). Passt genau eine Abwandlung zum gelesenen Ort, ist das ein starker
+ * Hinweis – und zwar auf die Zahl, nicht auf den Ort.
+ *
+ * @param suche Funktion Postleitzahl → Ortsnamen. Als Parameter, damit sich die
+ *        Regel ohne geladene Tabelle prüfen lässt.
+ */
+export function ziffernKandidaten(plz, ort, suche) {
+  const gesucht = falte(ort || '');
+  if (!/^\d{5}$/.test(plz || '') || !gesucht) return [];
+  const treffer = [];
+  for (let stelle = 0; stelle < 5; stelle += 1) {
+    for (let ziffer = 0; ziffer <= 9; ziffer += 1) {
+      const kandidat = `${plz.slice(0, stelle)}${ziffer}${plz.slice(stelle + 1)}`;
+      if (kandidat === plz || treffer.includes(kandidat)) continue;
+      const namen = suche(kandidat) || [];
+      if (namen.some((name) => falte(name) === gesucht || falte(name).startsWith(gesucht))) {
+        treffer.push(kandidat);
+      }
+    }
+  }
+  return treffer;
+}
+
+/**
+ * Prüft eine zerlegte Anschrift; ohne Tabelle oder ohne Postleitzahl stumm.
+ *
+ * Widerspricht die Postleitzahl dem Ort – oder kennt die Tabelle sie gar nicht –,
+ * wird zuerst geprüft, ob **sie** verlesen wurde. Das ist der wahrscheinlichere
+ * Fall: ein Ortsname trägt viele Buchstaben und damit viel Redundanz, eine
+ * fünfstellige Zahl keine.
+ */
 export function pruefeAnschrift({ postalCode, city } = {}) {
   if (!tabelleBereit() || !postalCode) return { status: 'unbekannt', vorschlag: '' };
-  return beurteileOrt(orteZu(postalCode), city);
+  const urteil = beurteileOrt(orteZu(postalCode), city);
+  if (urteil.status !== 'widerspruch' && orteZu(postalCode)) return urteil;
+
+  const kandidaten = ziffernKandidaten(postalCode, city, orteZu);
+  if (kandidaten.length === 1) {
+    return { status: 'plz-vertippt', vorschlag: kandidaten[0], ort: city, kandidaten };
+  }
+  if (kandidaten.length > 1) {
+    return { status: 'plz-mehrdeutig', vorschlag: '', ort: city, kandidaten };
+  }
+  return urteil;
 }

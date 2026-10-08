@@ -9,8 +9,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { beurteileOrt } from '../../web/js/plz.js';
-import { ersetzeOrt } from '../../web/js/adressen.js';
+import { beurteileOrt, ziffernKandidaten } from '../../web/js/plz.js';
+import { ersetzeOrt, ersetzePostleitzahl } from '../../web/js/adressen.js';
 
 test('Abgeschnittener Ort wird als Abkürzung erkannt', () => {
   // Der Anlass: die Erkennung las „WE“, wo „WEIMAR“ stand.
@@ -57,4 +57,45 @@ test('Der Ort wird in der Anschrift ersetzt, alles andere bleibt', () => {
 test('Ohne Postleitzahlzeile ändert sich nichts', () => {
   const text = ['Musterverein e.V.', 'Beispielweg 3'].join('\n');
   assert.equal(ersetzeOrt(text, 'Weimar'), text);
+});
+
+// ---------------------------------------------------------------------------
+// Wenn die Zahl verlesen wurde, nicht der Ort
+//
+// Ein Umschlag nach „07749 Jena“ wurde als „87749“ gelesen — die führende Null
+// als Acht. Die Prüfung meldete einen Widerspruch zu Jena und bot den Ort zu
+// 87749 an: ausgerechnet die falsche Richtung. Ein Ortsname trägt viele
+// Buchstaben und damit Redundanz, eine fünfstellige Zahl keine.
+// ---------------------------------------------------------------------------
+
+const TABELLE = new Map([
+  ['07743', ['Jena']],
+  ['07745', ['Jena']],
+  ['07749', ['Jena']],
+  ['87749', ['Hawangen']],
+  ['99423', ['Weimar']],
+]);
+const suche = (plz) => TABELLE.get(plz) || null;
+
+test('Eine verlesene Ziffer wird gefunden, wenn sie eindeutig ist', () => {
+  assert.deepEqual(ziffernKandidaten('87749', 'Jena', suche), ['07749']);
+});
+
+test('Mehrere passende Postleitzahlen bleiben mehrere', () => {
+  // 07744 gibt es nicht; drei Jenaer Postleitzahlen liegen eine Ziffer daneben.
+  assert.deepEqual(ziffernKandidaten('07744', 'Jena', suche), ['07743', '07745', '07749']);
+});
+
+test('Ohne Ort oder ohne fünfstellige Zahl keine Kandidaten', () => {
+  assert.deepEqual(ziffernKandidaten('87749', '', suche), []);
+  assert.deepEqual(ziffernKandidaten('877', 'Jena', suche), []);
+  assert.deepEqual(ziffernKandidaten('87749', 'Hawangen', suche), [], 'passt bereits');
+});
+
+test('Die Postleitzahl wird ersetzt, der Ort bleibt stehen', () => {
+  const vorher = ['Herrn Max Muster', 'Luise-Seidler-Straße 39', '87749 Jena'].join('\n');
+  assert.equal(
+    ersetzePostleitzahl(vorher, '07749'),
+    ['Herrn Max Muster', 'Luise-Seidler-Straße 39', '07749 Jena'].join('\n'),
+  );
 });

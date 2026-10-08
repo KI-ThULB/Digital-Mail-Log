@@ -14,7 +14,13 @@
 import { store, requestPersistence } from './db.js';
 import { api, ApiError, flushQueue, refreshFromServer, uuid } from './api.js';
 import { recogniseText, engineStatus, ladeBild, dreheBild, DREHUNGEN } from './ocr.js';
-import { parseAddress, parseLabel, ohneAnkerbeschriftung, ersetzeOrt } from './adressen.js';
+import {
+  parseAddress,
+  parseLabel,
+  ohneAnkerbeschriftung,
+  ersetzeOrt,
+  ersetzePostleitzahl,
+} from './adressen.js';
 import { ladeTabelle, pruefeAnschrift } from './plz.js';
 import { parsePostage, displayPostage } from './porto.js';
 
@@ -1283,20 +1289,46 @@ function pruefeSeite(seite) {
   const bereich = $(`${seite}-pruefung`);
   const feld = $(`${seite}-adresse`);
   const zerlegt = parseAddress(feld.value);
-  const { status, vorschlag } = pruefeAnschrift(zerlegt);
+  const urteil = pruefeAnschrift(zerlegt);
+  const { status, vorschlag, kandidaten } = urteil;
 
-  if (status === 'unbekannt' || status === 'stimmt' || !vorschlag) {
+  if (status === 'unbekannt' || status === 'stimmt') {
     bereich.hidden = true;
     bereich.replaceChildren();
     return;
   }
 
+  // Mehrere passende Postleitzahlen: benennen, nichts anbieten. Welche von
+  // ihnen stimmt, steht auf dem Umschlag und sonst nirgends.
+  if (status === 'plz-mehrdeutig') {
+    bereich.replaceChildren(
+      el('span', {
+        text:
+          `Die Postleitzahl ${zerlegt.postalCode} passt nicht zu „${zerlegt.city}“. ` +
+          `Dorthin gehören ${kandidaten.join(', ')} – bitte am Umschlag prüfen.`,
+      }),
+    );
+    bereich.hidden = false;
+    return;
+  }
+
+  if (!vorschlag) {
+    bereich.hidden = true;
+    bereich.replaceChildren();
+    return;
+  }
+
+  // Bei „plz-vertippt“ wird die **Zahl** ersetzt, nicht der Ort.
+  const zahlFalsch = status === 'plz-vertippt';
   const text = {
     ergaenzen: `Zur Postleitzahl ${zerlegt.postalCode} gehört ${vorschlag}. Kein Ort erkannt.`,
     abkuerzung: `Erkannt: „${zerlegt.city}“. Zur Postleitzahl ${zerlegt.postalCode} gehört ${vorschlag}.`,
     widerspruch:
       `Erkannt: „${zerlegt.city}“, zur Postleitzahl ${zerlegt.postalCode} gehört aber ${vorschlag}. ` +
       'Bitte am Umschlag prüfen – es kann auch die Postleitzahl falsch gelesen sein.',
+    'plz-vertippt':
+      `Die Postleitzahl ${zerlegt.postalCode} passt nicht zu „${zerlegt.city}“, ` +
+      `${vorschlag} dagegen schon – eine Ziffer Unterschied. Vermutlich wurde die Zahl verlesen.`,
   }[status];
 
   bereich.replaceChildren(
@@ -1305,7 +1337,9 @@ function pruefeSeite(seite) {
       type: 'button',
       text: `${vorschlag} übernehmen`,
       onclick: () => {
-        feld.value = ersetzeOrt(feld.value, vorschlag);
+        feld.value = zahlFalsch
+          ? ersetzePostleitzahl(feld.value, vorschlag)
+          : ersetzeOrt(feld.value, vorschlag);
         state.dirty = true;
         pruefeSeite(seite);
       },

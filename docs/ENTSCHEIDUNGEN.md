@@ -367,8 +367,13 @@ in `web/daten/LIZENZ-plz.txt` und in der Fußzeile der Anwendung.
   übrig. Deshalb schlägt die Oberfläche einen Ort nur vor, wenn das Gelesene ein
   **Anfang** des Tabellennamens ist oder gar kein Ort gelesen wurde – ein richtig
   gelesener Ort wird nie überschrieben.
-* Bei **Widerspruch** wird gesagt, was nicht zusammenpasst, und nichts geändert:
-  es kann ebenso gut die Postleitzahl falsch gelesen sein.
+* Bei **Widerspruch** wird zuerst geprüft, ob die **Zahl** verlesen wurde:
+  liegt genau eine Abwandlung mit einer anderen Ziffer beim gelesenen Ort, wird
+  sie angeboten (07.10.2026 ergänzt, nach einem Umschlag, dessen führende Null
+  als Acht gelesen wurde). Ein Ortsname trägt viele Buchstaben und damit
+  Redundanz, eine fünfstellige Zahl keine. Passen mehrere, werden sie benannt
+  und nichts angeboten; passt keine, bleibt es bei der Feststellung des
+  Widerspruchs, ohne Änderung.
 * Die Tabelle veraltet. Sie lässt sich mit einem Aufruf neu erzeugen; das gehört
   in die Pflegeroutine der Einrichtung.
 

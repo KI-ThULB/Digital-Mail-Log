@@ -554,3 +554,17 @@ export function ersetzeOrt(text, ort) {
   });
   return zeilen.join('\n');
 }
+
+/** Schreibt in einer Anschrift die Postleitzahl neu, der Ort bleibt stehen. */
+export function ersetzePostleitzahl(text, plz) {
+  let getroffen = false;
+  return tidy(text)
+    .map((zeile) => {
+      if (getroffen) return zeile;
+      const treffer = matchPostalLine(zeile);
+      if (!treffer) return zeile;
+      getroffen = true;
+      return `${plz} ${treffer.city}`.trim();
+    })
+    .join('\n');
+}

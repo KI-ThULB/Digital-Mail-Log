@@ -1,6 +1,6 @@
 # Teststatus
 
-Stand 21.09.2026.
+Stand 08.10.2026.
 
 ## Ergebnis
 
@@ -10,9 +10,9 @@ Stand 21.09.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 41 | bestanden |
+| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 45 | bestanden |
 | Oberfläche im Browser (`tests/test_oberflaeche.py`) | 14 | bestanden |
-| **Summe** | **143** | **bestanden** |
+| **Summe** | **147** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -92,6 +92,13 @@ jeder Bereich einzeln erkannt. Die Angaben landen auf der Seite, die markiert
 wurde — nicht auf der anderen —, mitmarkierte Beschriftungen („Empfänger:“)
 landen in keinem Feld, und der Statustext benennt jede Seite einzeln. Geprüft ist
 damit auch die Umrechnung von Anteilen in Bildpunkte.
+
+**Verlesene Postleitzahl.** Passt die Zahl nicht zum Ort, liegt aber genau eine
+Abwandlung mit einer anderen Ziffer richtig, wird **die Zahl** zur Berichtigung
+angeboten statt des Ortes: „87749 Jena“ → „07749 Jena“. Sind mehrere
+Abwandlungen möglich, werden sie benannt und nichts angeboten. Anlass war ein
+echter Umschlag, auf dem die führende Null als Acht gelesen wurde — die Prüfung
+bot daraufhin den Ort zu 87749 an, also die falsche Richtung.
 
 **Gefüllte Felder.** Eine neue Erkennung überschreibt nichts, was schon dasteht
 — eine Berichtigung von Hand darf nicht verloren gehen. Sie sagt es jetzt aber

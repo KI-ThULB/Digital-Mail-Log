@@ -152,11 +152,72 @@ function isNoise(line) {
   return RAUSCHEN.some((pattern) => pattern.test(line));
 }
 
+/**
+ * Glättet die typischen Verwechslungen der Texterkennung in einer
+ * Postleitzahl: O/o/D/Q → 0, I/l → 1, S → 5, B → 8, Z → 2.
+ *
+ * Nur am Zeilenanfang, nur bei genau fünf Zeichen, nur wenn danach ein Ort
+ * oder nichts folgt, und nur wenn mindestens drei echte Ziffern darunter sind.
+ * So wird aus „O7749 Jena“ die Postleitzahl 07749, aus „Olbersdorf“ aber
+ * nichts. Ohne diese Glättung verschwand die Zeile spurlos: sie war weder
+ * Postleitzahl noch Straße noch Kopfzeile und fiel durch jedes Raster.
+ */
+export function glaetteZiffern(zeile) {
+  const treffer = (zeile || '').match(/^([0-9OoDQIlSBZ]{5})(?=[\s-]*[A-Za-zÄÖÜäöüß]|\s*$)/);
+  if (!treffer) return zeile;
+  const roh = treffer[1];
+  if ((roh.match(/\d/g) || []).length < 3) return zeile;
+  const zahl = roh
+    .replace(/[OoDQ]/g, '0')
+    .replace(/[Il]/g, '1')
+    .replace(/S/g, '5')
+    .replace(/B/g, '8')
+    .replace(/Z/g, '2');
+  return zahl + zeile.slice(5);
+}
+
+/** Sieht die Zeile nach einer – womöglich verstümmelten – Postleitzahl aus? */
+function moeglichePostleitzahl(zeile) {
+  const geglaettet = glaetteZiffern(zeile);
+  if (/^\d{5}$/.test(geglaettet)) return true;
+  // Mindestens vier Ziffern und ein Wort: so sieht eine Postleitzahlzeile aus,
+  // in die die Erkennung Zeichen hineingelesen hat („0?7#49 Jena“).
+  return (geglaettet.match(/\d/g) || []).length >= 4 && /[A-Za-zÄÖÜäöüß]{3,}/.test(geglaettet);
+}
+
+/**
+ * Führt eine allein stehende Postleitzahl mit der Ortszeile darunter zusammen.
+ *
+ * Bei großem Abstand zwischen Zahl und Ort trennt die Erkennung gern in zwei
+ * Zeilen: „07749“ und „Jena“. Einzeln ist keine davon eine Postleitzahlzeile.
+ */
+function verbindeGetrenntePostleitzahl(zeilen) {
+  const ergebnis = [];
+  for (let i = 0; i < zeilen.length; i += 1) {
+    const zahl = glaetteZiffern(zeilen[i]);
+    const folgende = zeilen[i + 1];
+    if (
+      /^\d{5}$/.test(zahl) &&
+      folgende &&
+      /^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß .()/-]{1,40}$/.test(folgende) &&
+      folgende.split(/\s+/).length <= 4
+    ) {
+      ergebnis.push(`${zahl} ${folgende}`);
+      i += 1;
+    } else {
+      ergebnis.push(zeilen[i]);
+    }
+  }
+  return ergebnis;
+}
+
 /** Erkennt „07743 Jena“, „D-07743 Jena“, „CH-8001 Zürich“. */
 export function matchPostalLine(line) {
   // „07743 Jena“, aber auch „07743Jena“: auf einem echten Umschlag stand das
   // Leerzeichen nicht, und die Erkennung erfindet keines.
-  const german = line.match(/^(?:(?:d|de)\s*-\s*)?(\d{5})[\s-]*([A-Za-zÄÖÜäöüß].*)$/i);
+  const german =
+    line.match(/^(?:(?:d|de)\s*-\s*)?(\d{5})[\s-]*([A-Za-zÄÖÜäöüß].*)$/i) ||
+    glaetteZiffern(line).match(/^(\d{5})[\s-]*([A-Za-zÄÖÜäöüß].*)$/);
   if (german) return { postalCode: german[1], city: german[2].trim(), country: '' };
   const foreign = line.match(/^([A-Z]{1,3})\s*-\s*(\d{4,6})\s+(.+)$/i);
   if (foreign) {
@@ -385,11 +446,18 @@ function leeresErgebnis() {
 export function parseAddress(text) {
   const notes = [];
   const all = tidy(text);
-  const clean = all.filter((line) => !isNoise(line) && istLesbar(line));
+  // Eine verstümmelte Postleitzahlzeile („07749“ allein, „0?7#49 Jena“) besteht
+  // die Lesbarkeitsprüfung nicht – sie hat zu wenige Buchstaben. Sie darf aber
+  // nicht schon hier verschwinden, sonst kommt sie weder ins Feld noch in einen
+  // Hinweis. Über der Straße fängt die Kopfzeilenprüfung sie später ab.
+  const clean = all.filter(
+    (line) => !isNoise(line) && (istLesbar(line) || moeglichePostleitzahl(line)),
+  );
   if (all.length !== clean.length) notes.push('Unlesbare Zeilen und Frankierung wurden übergangen.');
 
-  const { returnLine, rest } = splitReturnLine(clean);
+  const { returnLine, rest: getrennt } = splitReturnLine(clean);
   if (returnLine) notes.push('Eine Zeile wurde als Absenderangabe des Fensterumschlags gewertet.');
+  const rest = verbindeGetrenntePostleitzahl(getrennt);
 
   let postalCode = '';
   let city = '';
@@ -440,6 +508,12 @@ export function parseAddress(text) {
   const kopfzeilen = [];
   let verworfen = uebergangen;
   for (const line of head) {
+    // Über der Straße gelten die strengen Regeln wie bisher: eine Zeile, die nur
+    // als mögliche Postleitzahl durchgelassen wurde, ist hier kein Name.
+    if (!istLesbar(line)) {
+      verworfen += 1;
+      continue;
+    }
     const { text: ohneAnrede, had } = stripSalutation(line);
     // Eine Zeile, die nur aus „Herrn“ oder „Firma“ besteht, trägt nichts.
     if (had && !ohneAnrede) {
@@ -466,12 +540,25 @@ export function parseAddress(text) {
     organisationLines.push(personLines.shift());
   }
 
+  // Was unter der Straße steht und keine Postleitzahlzeile ergab, ging früher
+  // spurlos verloren – kein Feld, kein Hinweis. Wurde keine Postleitzahl
+  // erkannt, bleiben diese Zeilen jetzt in der Anschrift stehen, so wie sie
+  // gelesen wurden: dann sieht man, was dort stand, und kann es berichtigen.
+  const unterStrasse =
+    postalIndex === -1 && streetIndex !== -1
+      ? rest.slice(streetIndex + 1).filter((zeile) => istLesbar(zeile) || moeglichePostleitzahl(zeile))
+      : [];
+  if (unterStrasse.length) {
+    notes.push('Die Zeile unter der Straße ließ sich nicht als Postleitzahl und Ort lesen und steht unverändert in der Anschrift.');
+  }
+
   const person = personLines.join(', ');
   const organisation = organisationLines.join(', ');
   const address = [
     ...kopfzeilen,
     street,
     [postalCode, city].filter(Boolean).join(' '),
+    ...unterStrasse,
     country && country !== 'Deutschland' ? country : '',
   ]
     .filter(Boolean)

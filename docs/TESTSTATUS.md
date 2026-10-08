@@ -10,9 +10,9 @@ Stand 08.10.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 45 | bestanden |
+| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 48 | bestanden |
 | Oberfläche im Browser (`tests/test_oberflaeche.py`) | 14 | bestanden |
-| **Summe** | **147** | **bestanden** |
+| **Summe** | **150** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -254,3 +254,13 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     Zuversicht, und es fehlte der halbe Adressblock. Behoben: erst schneiden,
     dann drehen. **Nur am echten Foto sichtbar geworden**; die erfundene Vorlage
     hatte das ganze Bild markiert und konnte den Fehler nicht zeigen.
+17. **Postleitzahl und Ort verschwanden ohne Hinweis.** Las die Erkennung die
+    führende Null als Buchstaben („O7749 Jena“) oder setzte Zahl und Ort auf
+    zwei Zeilen, passte die Zeile auf kein Muster und wurde als unlesbar
+    verworfen. Die Anschrift endete dann bei der Straße. Behoben: am
+    Zeilenanfang werden die typischen Verwechslungen O/D/Q→0, I/l→1, S→5,
+    B→8, Z→2 geglättet, sofern mindestens drei echte Ziffern dastehen, und eine
+    alleinstehende Postleitzahl wird mit dem Ort in der Folgezeile verbunden.
+    Was sich auch so nicht lesen lässt, bleibt unverändert in der Anschrift
+    stehen, mit Hinweis. **Am echten Umschlag aufgefallen**, die Tests hatten
+    nur saubere Postleitzahlen.

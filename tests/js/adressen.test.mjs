@@ -20,6 +20,7 @@ import {
   parseLabel,
   istLesbar,
   ohneAnkerbeschriftung,
+  glaetteZiffern,
 } from '../../web/js/adressen.js';
 
 test('Postleitzahlzeile in verschiedenen Schreibweisen', () => {
@@ -389,4 +390,37 @@ test('Buchstabensalat um eine gute Zeile herum wird verworfen', () => {
   assert.equal(parsed.organisation, 'Musterrat Sachsen e.V.');
   assert.equal(parsed.street, 'Beispielstraße 4');
   assert.equal(parsed.address, 'Musterrat Sachsen e.V.\nBeispielstraße 4\n01067 DRE');
+});
+
+// Anlass: an einem Umschlag an eine Privatanschrift fehlten Postleitzahl und
+// Ort ganz. Die Zeile war gelesen, aber als „O7749 Jena“ (Buchstabe O statt
+// Null) oder auf zwei Zeilen verteilt – und verschwand dann stillschweigend.
+// Die Angaben hier sind erfunden.
+
+test('Buchstabe O statt führender Null in der Postleitzahl', () => {
+  assert.equal(glaetteZiffern('O7749 Jena'), '07749 Jena');
+  assert.equal(glaetteZiffern('Olbersdorf'), 'Olbersdorf', 'Ortsnamen bleiben unberührt');
+  const parsed = parseAddress('Erika Musterfrau\nBeispielstraße 39\nO7749 Jena');
+  assert.equal(parsed.postalCode, '07749');
+  assert.equal(parsed.city, 'Jena');
+  assert.equal(parsed.street, 'Beispielstraße 39');
+});
+
+test('Postleitzahl und Ort auf zwei Zeilen gelesen', () => {
+  for (const text of [
+    'Erika Musterfrau\nBeispielstraße 39\n07749\nJena',
+    'Erika Musterfrau\nBeispielstraße 39\nO7749\nJena',
+  ]) {
+    const parsed = parseAddress(text);
+    assert.equal(parsed.postalCode, '07749', text);
+    assert.equal(parsed.city, 'Jena', text);
+    assert.ok(parsed.address.endsWith('07749 Jena'), parsed.address);
+  }
+});
+
+test('Unlesbare Ortszeile unter der Straße bleibt sichtbar', () => {
+  const parsed = parseAddress('Erika Musterfrau\nBeispielstraße 39\n0?7#49 Jena');
+  assert.equal(parsed.postalCode, '');
+  assert.ok(parsed.address.includes('0?7#49 Jena'), 'die Zeile darf nicht verschwinden');
+  assert.ok(parsed.notes.some((n) => n.includes('unter der Straße')));
 });

@@ -18,6 +18,7 @@ import {
   parseAddress,
   parseLabel,
   ohneAnkerbeschriftung,
+  parseVermischt,
   ersetzeOrt,
   ersetzePostleitzahl,
 } from './adressen.js';
@@ -1247,7 +1248,7 @@ function fuelleSeite(seite, quelle) {
 
   zeigeUebernahme(seite, abweichend);
   suggestContacts(seite);
-  pruefeSeite(seite);
+  pruefeSeite(seite, { nachErkennung: true });
   return { uebernommen, offen: abweichend.length };
 }
 
@@ -1309,7 +1310,12 @@ function verarbeiteEingefuegt(seite, text) {
     einfuegenStand(seite, 'Die Zwischenablage ist leer.');
     return false;
   }
-  const zerlegt = parseAddress(ohneAnkerbeschriftung(roh));
+  // Ein ganzes Etikett, spaltenweise gelesen, enthält mehrere Postleitzahlen
+  // in wilder Reihenfolge. Dann wird nach Bausteinen sortiert, sonst gilt der
+  // Text als ein einzelner Adressblock.
+  const vermischt = parseVermischt(roh);
+  let zerlegt = vermischt?.[seite];
+  if (!zerlegt?.address) zerlegt = parseAddress(ohneAnkerbeschriftung(roh));
   if (!zerlegt.address) {
     einfuegenStand(seite, 'Im eingefügten Text war keine Anschrift zu erkennen.');
     return false;
@@ -1318,8 +1324,18 @@ function verarbeiteEingefuegt(seite, text) {
   if (zerlegt.shipmentType && !$('art').value) $('art').value = zerlegt.shipmentType;
   if (wirkung.uebernommen) state.dirty = true;
 
+  // Steht die andere Seite gleich mit im Text und ist sie noch leer, wird sie
+  // mit ausgefüllt. Eine schon gefüllte andere Seite bleibt unberührt.
+  const andere = seite === 'absender' ? 'empfaenger' : 'absender';
+  let auchAndere = false;
+  const leer = ['name', 'org', 'adresse'].every((f) => !$(`${andere}-${f}`).value.trim());
+  if (vermischt?.[andere]?.address && leer) {
+    auchAndere = fuelleSeite(andere, vermischt[andere]).uebernommen;
+    if (auchAndere) state.dirty = true;
+  }
+
   $('ocr-text').textContent = `— ${ZIELWORT[seite]} (eingefügt) —\n${roh}`;
-  $('ocr-herkunft').textContent = zerlegt.notes.join(' ');
+  $('ocr-herkunft').textContent = [...(vermischt?.notes || []), ...zerlegt.notes].join(' ');
   $('ocr-ergebnis').hidden = false;
 
   $(`${seite}-einfuegen`).hidden = true;
@@ -1327,7 +1343,7 @@ function verarbeiteEingefuegt(seite, text) {
   einfuegenStand(
     seite,
     wirkung.uebernommen
-      ? 'Eingefügt und auf die Felder verteilt. Bitte prüfen.'
+      ? `Eingefügt und auf die Felder verteilt${auchAndere ? `, ${ZIELWORT[andere]} gleich mit` : ''}. Bitte prüfen.`
       : wirkung.offen
         ? 'Eingefügt. Die Felder waren schon gefüllt – die Übernahme wird unten angeboten.'
         : 'Eingefügt. Die Felder stimmen bereits.',
@@ -1389,10 +1405,26 @@ function wireEinfuegen() {
  * die Übernahme an – dieselbe Linie wie bei der Erkennung.
  * ------------------------------------------------------------------ */
 
-function pruefeSeite(seite) {
+function pruefeSeite(seite, { nachErkennung = false } = {}) {
   const bereich = $(`${seite}-pruefung`);
   const feld = $(`${seite}-adresse`);
   const zerlegt = parseAddress(feld.value);
+
+  // Straße ohne Postleitzahl direkt nach einer Erkennung: auf Paketetiketten
+  // steht die Postleitzahl des Empfängers oft groß und abgesetzt vom übrigen
+  // Block und fällt beim Markieren heraus. Sagen statt schweigen.
+  if (nachErkennung && zerlegt.street && !zerlegt.postalCode) {
+    bereich.replaceChildren(
+      el('span', {
+        text:
+          'Postleitzahl und Ort fehlen. Auf Paketetiketten stehen sie oft groß und ' +
+          'abgesetzt vom übrigen Block – bitte mitmarkieren oder von Hand ergänzen.',
+      }),
+    );
+    bereich.hidden = false;
+    return;
+  }
+
   const urteil = pruefeAnschrift(zerlegt);
   const { status, vorschlag, kandidaten } = urteil;
 

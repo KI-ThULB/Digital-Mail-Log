@@ -408,6 +408,13 @@ markierter Bereich, weil die Auswahl eine bewusste war. Gefüllte Felder werden
 nicht überschrieben, das Erkannte wird wie bei der Fotoerkennung zur Übernahme
 angeboten.
 
+**Ganzes Etikett eingefügt (ergänzt am selben Tag).** Live Text liest
+Paketetiketten spaltenweise und gedrehte Blöcke rückwärts. Enthält der Text
+mehr als eine Postleitzahl, wird er deshalb nach Bausteinen zerlegt statt nach
+Reihenfolge: die Anschrift des Frachtführers heraus, der Block an der
+Beschriftung „Absender“ an den Absender, der Rest an den Empfänger. Ist die
+andere Seite noch leer, wird sie gleich mit ausgefüllt.
+
 **Zurückzunehmen, wenn.** Die eingebaute Erkennung im Pilotbetrieb gleichauf
 liegt. Dann wäre der Knopf ein zweiter Weg ohne Mehrwert.
 

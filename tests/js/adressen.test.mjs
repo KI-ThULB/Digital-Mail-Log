@@ -21,6 +21,7 @@ import {
   istLesbar,
   ohneAnkerbeschriftung,
   glaetteZiffern,
+  parseVermischt,
 } from '../../web/js/adressen.js';
 
 test('Postleitzahlzeile in verschiedenen Schreibweisen', () => {
@@ -423,4 +424,48 @@ test('Unlesbare Ortszeile unter der Straße bleibt sichtbar', () => {
   assert.equal(parsed.postalCode, '');
   assert.ok(parsed.address.includes('0?7#49 Jena'), 'die Zeile darf nicht verschwinden');
   assert.ok(parsed.notes.some((n) => n.includes('unter der Straße')));
+});
+
+// Anlass: die Texterkennung der Fotos-App las ein DPD-Etikett spaltenweise.
+// Postleitzahl und Ort des Empfängers standen ganz am Ende, hinter dem
+// kopfstehenden Absenderblock und der Anschrift des Depots. Aufbau wie am
+// echten Etikett, Angaben erfunden.
+const DURCHEINANDER = [
+  'Erika Musterfrau',
+  'dpd',
+  'Tel. 030 1234567',
+  'Beispielstr 39',
+  'DE-10115 Berlin',
+  'Musterweg 100',
+  'Musterdruck',
+  'Absender',
+  'DE-12345 Depotstadt',
+  'Lagerstr.',
+  'DPD Deutschland GmbH',
+  'Depot 0010999',
+  'DE-07749 Jena',
+].join('\n');
+
+test('Spaltenweise gelesenes Paketetikett wird nach Bausteinen sortiert', () => {
+  const r = parseVermischt(DURCHEINANDER);
+  assert.equal(r.empfaenger.person, 'Erika Musterfrau');
+  assert.equal(r.empfaenger.address, 'Erika Musterfrau\nBeispielstr 39\n07749 Jena');
+  assert.equal(r.empfaenger.postalCode, '07749');
+  assert.equal(r.absender.organisation, 'Musterdruck');
+  assert.equal(r.absender.address, 'Musterdruck\nMusterweg 100\n10115 Berlin');
+  assert.ok(r.notes.some((n) => n.includes('Frachtführer')));
+  assert.ok(!r.empfaenger.address.includes('Depotstadt'));
+  assert.ok(!r.absender.address.includes('Depotstadt'));
+});
+
+test('Absenderblock hinter der Beschriftung in normaler Reihenfolge', () => {
+  const r = parseVermischt(
+    'Absender:\nMusterverlag GmbH\nBeispielweg 3\n10115 Berlin\nMax Muster\nAm Markt 1\n99423 Weimar',
+  );
+  assert.equal(r.absender.address, 'Musterverlag GmbH\nBeispielweg 3\n10115 Berlin');
+  assert.equal(r.empfaenger.address, 'Max Muster\nAm Markt 1\n99423 Weimar');
+});
+
+test('Ein einzelner Adressblock bleibt dem gewöhnlichen Parser', () => {
+  assert.equal(parseVermischt('Erika Musterfrau\nBeispielstraße 39\n07749 Jena'), null);
 });

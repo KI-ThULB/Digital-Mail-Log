@@ -10,9 +10,9 @@ Stand 08.10.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 48 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 16 | bestanden |
-| **Summe** | **152** | **bestanden** |
+| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 51 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 18 | bestanden |
+| **Summe** | **157** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -264,3 +264,15 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     Was sich auch so nicht lesen lässt, bleibt unverändert in der Anschrift
     stehen, mit Hinweis. **Am echten Umschlag aufgefallen**, die Tests hatten
     nur saubere Postleitzahlen.
+18. **Postleitzahl und Ort des Empfängers fehlten weiter, auch mit Live Text.**
+    Die Ursache lag nicht in der Erkennung, sondern im Etikett. Auf dem
+    DPD-Etikett steht die Postleitzahl des Empfängers groß und abgesetzt vom
+    Block aus Name und Straße. Markiert man nur den Block, fehlt sie. Kopiert
+    man das ganze Etikett, liefert die Fotos-App die Zeilen spaltenweise: Name
+    und Straße oben, dazwischen der kopfstehende Absender rückwärts und die
+    Anschrift des Depots, „DE-07749 Jena“ ganz am Ende. Behoben: Text mit
+    mehreren Postleitzahlen wird nach Bausteinen sortiert. Die Anschrift des
+    Frachtführers fällt heraus, der Block an „Absender“ geht an den Absender,
+    der Rest an den Empfänger. Fehlt nach einer Erkennung die Postleitzahl zu
+    einer Straße, sagt die App das. **Erst am Rohtext sichtbar geworden**, den
+    der Nutzer in den Chat kopiert hat.

@@ -68,6 +68,9 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
    Apple-ID angemeldet sein, das Telefon muss die App aber nicht erreichen.
    Fragt der Browser, ob die Seite die Zwischenablage lesen darf, bitte
    zulassen. Sonst öffnet sich ein Feld, in das Sie mit ⌘V einfügen.
+   Bei **Paketetiketten** am besten den ganzen Etikettentext kopieren: die
+   Postleitzahl des Empfängers steht dort oft groß und abgesetzt. Die App
+   sortiert Empfänger, Absender und Paketdienst selbst auseinander.
 4. **Eigene Stelle antippen.** Über den Feldern der eigenen Seite stehen die
    gemerkten Stellen des Hauses. Ein Tipp füllt Name, Organisation, Anschrift und
    — beim Ausgang — das PSP-Element.

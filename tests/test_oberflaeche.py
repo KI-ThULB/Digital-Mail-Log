@@ -708,6 +708,58 @@ class BrowserFlow(unittest.TestCase):
         finally:
             kontext.close()
 
+    def _einfuegen(self, page, seite, text):
+        page.click(f"#einfuegen-{seite}")
+        page.wait_for_selector(f"#{seite}-einfuegen:not([hidden])")
+        page.eval_on_selector(
+            f"#{seite}-einfuegen-feld",
+            """(feld, text) => {
+                const daten = new DataTransfer();
+                daten.setData('text/plain', text);
+                feld.dispatchEvent(new ClipboardEvent('paste', { clipboardData: daten, bubbles: true, cancelable: true }));
+            }""",
+            text,
+        )
+
+    def test_spaltenweise_gelesenes_etikett_fuellt_beide_seiten(self):
+        """Live Text las ein DPD-Etikett spaltenweise: Postleitzahl und Ort des
+        Empfängers kamen ganz am Ende, hinter Absender und Depot. Erfundene Angaben."""
+        page = self.page
+        page.goto(self.base)
+        page.wait_for_selector("#kennung:not(:empty)")
+        page.click("#neu")
+        self._einfuegen(
+            page,
+            "empfaenger",
+            "Erika Musterfrau\ndpd\nTel. 030 1234567\nBeispielstr 39\nDE-10115 Berlin\n"
+            "Musterweg 100\nMusterdruck\nAbsender\nDE-12345 Depotstadt\nLagerstr.\n"
+            "DPD Deutschland GmbH\nDepot 0010999\nDE-07749 Jena",
+        )
+        page.wait_for_selector("#empfaenger-einfuegen-stand:not([hidden])")
+        self.assertEqual(
+            page.input_value("#empfaenger-adresse"),
+            "Erika Musterfrau\nBeispielstr 39\n07749 Jena",
+        )
+        self.assertEqual(page.input_value("#absender-org"), "Musterdruck")
+        self.assertEqual(
+            page.input_value("#absender-adresse"), "Musterdruck\nMusterweg 100\n10115 Berlin"
+        )
+        self.assertIn("gleich mit", page.text_content("#empfaenger-einfuegen-stand"))
+        self.assertEqual(self.errors, [])
+
+    def test_fehlende_postleitzahl_wird_benannt(self):
+        """Nur Name und Straße markiert: die App sagt, dass Postleitzahl und Ort fehlen."""
+        page = self.page
+        page.goto(self.base)
+        page.wait_for_selector("#kennung:not(:empty)")
+        page.click("#neu")
+        self._einfuegen(page, "empfaenger", "Erika Musterfrau\nBeispielstr 39")
+        page.wait_for_selector("#empfaenger-pruefung:not([hidden])")
+        self.assertIn("Postleitzahl und Ort fehlen", page.text_content("#empfaenger-pruefung"))
+        # Sobald von Hand ergänzt wird, verschwindet der Hinweis.
+        page.fill("#empfaenger-adresse", "Erika Musterfrau\nBeispielstr 39\n07749 Jena")
+        page.wait_for_selector("#empfaenger-pruefung", state="hidden")
+
     def test_text_einfuegen_ohne_zugriff_auf_die_zwischenablage(self):
         """Verweigert der Browser das Lesen, öffnet sich ein Feld zum Einfügen."""
         page = self.page

@@ -428,6 +428,141 @@ export function parseLabel(text) {
   return { empfaenger, absender, ankerGefunden: true, verworfeneZeilen: verworfen, notes };
 }
 
+/* ------------------------------------------------------------------ *
+ * Durcheinander gelesene Etiketten
+ *
+ * Die Texterkennung der Fotos-App liest ein Paketetikett spaltenweise und
+ * gedrehte Blöcke rückwärts. An einem echten DPD-Etikett kam der Empfänger in
+ * drei Teilen heraus: Name und Straße oben, dazwischen der kopfstehende
+ * Absenderblock in umgekehrter Zeilenfolge, dann die Anschrift des Depots und
+ * erst ganz am Ende, groß gedruckt, „DE-07749 Jena“. Ein Parser, der Zeilen in
+ * ihrer Reihenfolge liest, verliert dabei Postleitzahl und Ort.
+ *
+ * Hier wird deshalb nach Bausteinen sortiert statt nach Reihenfolge:
+ * erst der Frachtführer mit seiner eigenen Anschrift heraus, dann der Block
+ * an der Beschriftung „Absender“, und was übrig bleibt, ist der Empfänger.
+ * ------------------------------------------------------------------ */
+
+/** Straße ohne Hausnummer, wie sie in Firmenanschriften von Depots steht. */
+const STRASSE_OHNE_NUMMER = /(str\.?|stra(ß|ss)e|weg|platz|allee|ring|damm|gasse|ufer)$/i;
+
+/** Der Frachtführer selbst als Firma oder Standort, nicht nur sein Logo. */
+function istFrachtfuehrerFirma(zeile) {
+  return (
+    /^depot\b/i.test(zeile) ||
+    (FRACHTFUEHRER.test(zeile) && /\b(gmbh|ag|se|kg|depot|niederlassung|hub)\b/i.test(zeile))
+  );
+}
+
+function bausteinArt(zeile) {
+  const anker = ANKER.find((a) => a.muster.test(zeile));
+  if (anker) return `anker-${anker.seite}`;
+  if (istFrachtfuehrerFirma(zeile) || istFremdzeile(zeile) || isNoise(zeile)) return 'fremd';
+  if (matchPostalLine(zeile)) return 'plz';
+  if (matchStreetLine(zeile) || STRASSE_OHNE_NUMMER.test(zeile)) return 'strasse';
+  return 'name';
+}
+
+/**
+ * Sammelt einen Adressblock an einer Beschriftung, erst dahinter, dann davor.
+ * Der Block ist zusammenhängend und endet, sobald Straße und Postleitzahl
+ * beisammen sind oder eine zweite Straße oder Postleitzahl käme.
+ */
+function sammleAnAnker(bausteine, index) {
+  const sammle = (schritt) => {
+    const block = [];
+    let plz = false;
+    let strasse = false;
+    for (let i = index + schritt; i >= 0 && i < bausteine.length && block.length < 5; i += schritt) {
+      const b = bausteine[i];
+      if (b.vergeben || b.art === 'fremd' || b.art.startsWith('anker')) break;
+      if ((b.art === 'plz' && plz) || (b.art === 'strasse' && strasse)) break;
+      block.push(b);
+      if (b.art === 'plz') plz = true;
+      if (b.art === 'strasse') strasse = true;
+      if (plz && strasse) break;
+    }
+    return { block, plz };
+  };
+  const danach = sammle(1);
+  const gewaehlt = danach.plz ? danach : sammle(-1);
+  if (!gewaehlt.plz) return [];
+  // Rückwärts gesammelt heißt: wieder in Lesereihenfolge bringen.
+  return gewaehlt === danach ? gewaehlt.block : gewaehlt.block.reverse();
+}
+
+/** Ordnet Bausteine so, wie eine Anschrift geschrieben wird. */
+function inAnschriftfolge(bausteine) {
+  const rang = { name: 0, strasse: 1, plz: 2 };
+  return bausteine
+    .map((b, i) => ({ b, i }))
+    .sort((x, y) => rang[x.b.art] - rang[y.b.art] || x.i - y.i)
+    .map(({ b }) => b.zeile)
+    .join('\n');
+}
+
+/**
+ * Zerlegt Text, dessen Zeilen nicht in Anschriftfolge stehen, in beide Seiten.
+ *
+ * @returns {{empfaenger:object, absender:object, notes:string[]}|null}
+ *   ``null``, wenn der Text nur eine Postleitzahl enthält: dann ist er ein
+ *   einzelner Adressblock und ``parseAddress`` der richtige Weg.
+ */
+export function parseVermischt(text) {
+  const zeilen = tidy(text).filter(
+    (z) => istAnkerzeile(z) || istFremdzeile(z) || isNoise(z) || istLesbar(z) || moeglichePostleitzahl(z),
+  );
+  const bausteine = zeilen.map((zeile) => ({ zeile, art: bausteinArt(zeile), vergeben: false }));
+  if (bausteine.filter((b) => b.art === 'plz').length < 2) return null;
+
+  const notes = [];
+  // 1. Die eigene Anschrift des Frachtführers: Straße und Postleitzahl, die
+  //    unmittelbar an seiner Firmenzeile stehen.
+  for (const [i, b] of bausteine.entries()) {
+    if (!istFrachtfuehrerFirma(b.zeile)) continue;
+    for (const schritt of [-1, 1]) {
+      const paar = [];
+      for (let j = i + schritt; j >= 0 && j < bausteine.length && paar.length < 2; j += schritt) {
+        const n = bausteine[j];
+        if (n.vergeben) break;
+        if (n.art === 'fremd') continue;
+        if (n.art !== 'plz' && n.art !== 'strasse') break;
+        if (paar.some((x) => x.art === n.art)) break;
+        paar.push(n);
+      }
+      if (paar.length === 2) {
+        for (const n of paar) n.vergeben = true;
+        notes.push(`Anschrift des Frachtführers übergangen (${paar.map((n) => n.zeile).join(', ')}).`);
+        break;
+      }
+    }
+  }
+
+  // 2. Die beschrifteten Blöcke.
+  const seiten = { empfaenger: [], absender: [] };
+  for (const [i, b] of bausteine.entries()) {
+    if (!b.art.startsWith('anker-')) continue;
+    const seite = b.art.slice('anker-'.length);
+    const block = sammleAnAnker(bausteine, i);
+    for (const n of block) n.vergeben = true;
+    seiten[seite].push(...block);
+  }
+
+  // 3. Der Rest gehört der Seite ohne Beschriftung.
+  const rest = bausteine.filter((b) => !b.vergeben && ['name', 'strasse', 'plz'].includes(b.art));
+  const offen = seiten.empfaenger.length ? 'absender' : 'empfaenger';
+  if (!seiten[offen].length && rest.filter((b) => b.art === 'plz').length === 1) {
+    seiten[offen] = rest;
+    notes.push('Die Zeilen standen nicht in Anschriftfolge und wurden nach Art sortiert.');
+  }
+
+  return {
+    empfaenger: seiten.empfaenger.length ? parseAddress(inAnschriftfolge(seiten.empfaenger)) : leeresErgebnis(),
+    absender: seiten.absender.length ? parseAddress(inAnschriftfolge(seiten.absender)) : leeresErgebnis(),
+    notes,
+  };
+}
+
 function leeresErgebnis() {
   return {
     person: '', organisation: '', street: '', postalCode: '', city: '', country: '',

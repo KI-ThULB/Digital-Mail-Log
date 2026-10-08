@@ -23,6 +23,10 @@ private/
 # Bestandteile der Texterkennung, per web/vendor/hole-tesseract.sh geholt
 web/vendor/tesseract/
 
+# Persönliche Hinweise für Claude Code, nicht für das Repository
+CLAUDE.local.md
+.claude/settings.local.json
+
 # Werkzeuge
 node_modules/
 build/

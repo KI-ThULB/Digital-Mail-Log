@@ -68,12 +68,14 @@ Weiterführend: [Unterlagen für den Pilotbetrieb](docs/pilot/) ·
 ## Tests
 
 ```sh
-python3 -m unittest tests.test_domain tests.test_storage tests.test_api -v   # 82 Tests
-node --test "tests/js/*.test.mjs"                                            # 17 Tests
+python3 -m unittest tests.test_domain tests.test_storage tests.test_api tests.test_server -v
+node --test "tests/js/*.test.mjs"
 
 pip install playwright pillow && playwright install chromium
-python3 -m unittest tests.test_oberflaeche -v                                # 4 Tests im Browser
+python3 -m unittest tests.test_oberflaeche -v   # im Browser
 ```
+
+Aktuelle Zahlen je Prüfstrecke: [Teststatus](docs/TESTSTATUS.md).
 
 Fachkern und Web-App prüfen denselben Portokorpus in
 `tests/konformitaet/porto.json`. Das hält die beiden Umsetzungen zusammen – im

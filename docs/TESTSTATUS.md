@@ -10,9 +10,9 @@ Stand 08.10.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 51 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 18 | bestanden |
-| **Summe** | **157** | **bestanden** |
+| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 54 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 19 | bestanden |
+| **Summe** | **161** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -276,3 +276,14 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     der Rest an den Empfänger. Fehlt nach einer Erkennung die Postleitzahl zu
     einer Straße, sagt die App das. **Erst am Rohtext sichtbar geworden**, den
     der Nutzer in den Chat kopiert hat.
+19. **Ein sauber markierter Absender blieb leer.** Bei einem Brief stand im
+    markierten Absenderbereich nur die einzeilige Absenderangabe. Der Parser
+    legte sie als Rücksendezeile des Fensterumschlags beiseite, was beim
+    ganzen Umschlag richtig ist, und für die Anschrift blieb nichts übrig. Die
+    Meldung lautete „nichts Sicheres gelesen“. Behoben: Text, der zu **einer**
+    Seite gehört (markierter Bereich, Foto nur dieser Seite, eingefügter
+    Text), wird mit `parseSeite` zerlegt. Findet sich keine Postleitzahlzeile,
+    wird eine einzeilige Anschrift an Mittelpunkt, Gedankenstrich, Semikolon,
+    Komma oder notfalls vor der Postleitzahl und der Hausnummer aufgeteilt.
+    „Abs.:“ am Anfang fällt weg. Erkannt an den Hinweisen der App im
+    Bildschirmfoto.

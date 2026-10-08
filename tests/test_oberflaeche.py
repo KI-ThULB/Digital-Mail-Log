@@ -747,6 +747,20 @@ class BrowserFlow(unittest.TestCase):
         self.assertIn("gleich mit", page.text_content("#empfaenger-einfuegen-stand"))
         self.assertEqual(self.errors, [])
 
+    def test_einzeilige_absenderangabe_wird_aufgeteilt(self):
+        """Ein Brief: der Absender steht in einer Zeile. Erfundene Angaben."""
+        page = self.page
+        page.goto(self.base)
+        page.wait_for_selector("#kennung:not(:empty)")
+        page.click("#neu")
+        self._einfuegen(page, "absender", "Musterverein e.V. · Beispielweg 3 · 99423 Weimar")
+        page.wait_for_selector("#absender-einfuegen-stand:not([hidden])")
+        self.assertEqual(page.input_value("#absender-org"), "Musterverein e.V.")
+        self.assertEqual(
+            page.input_value("#absender-adresse"), "Musterverein e.V.\nBeispielweg 3\n99423 Weimar"
+        )
+        self.assertEqual(self.errors, [])
+
     def test_fehlende_postleitzahl_wird_benannt(self):
         """Nur Name und Straße markiert: die App sagt, dass Postleitzahl und Ort fehlen."""
         page = self.page

@@ -22,6 +22,8 @@ import {
   ohneAnkerbeschriftung,
   glaetteZiffern,
   parseVermischt,
+  parseSeite,
+  zerlegeEinzeiler,
 } from '../../web/js/adressen.js';
 
 test('Postleitzahlzeile in verschiedenen Schreibweisen', () => {
@@ -468,4 +470,44 @@ test('Absenderblock hinter der Beschriftung in normaler Reihenfolge', () => {
 
 test('Ein einzelner Adressblock bleibt dem gewöhnlichen Parser', () => {
   assert.equal(parseVermischt('Erika Musterfrau\nBeispielstraße 39\n07749 Jena'), null);
+});
+
+// Anlass: bei einem Brief war der Absenderbereich sauber markiert, darin stand
+// nur die einzeilige Absenderangabe. Der Parser legte sie als Rücksendezeile
+// beiseite, und für die Anschrift blieb nichts. Angaben erfunden.
+test('Einzeilige Absenderangabe im markierten Bereich wird zur Anschrift', () => {
+  for (const zeile of [
+    'Musterverein e.V. · Beispielweg 3 · 99423 Weimar',
+    'Musterverein e.V. - Beispielweg 3 - 99423 Weimar',
+    'Musterverein e.V., Beispielweg 3, 99423 Weimar',
+    'Abs.: Musterverein e.V., Beispielweg 3, 99423 Weimar',
+    'Musterverein e.V. | Beispielweg 3 | 99423 Weimar',
+  ]) {
+    const p = parseSeite(zeile);
+    assert.equal(p.address, 'Musterverein e.V.\nBeispielweg 3\n99423 Weimar', zeile);
+    assert.equal(p.organisation, 'Musterverein e.V.', zeile);
+  }
+  // Rauschen um die Zeile herum stört nicht.
+  const p = parseSeite('x Ae\nMusterverein e.V. · Beispielweg 3 · 99423 Weimar\nMG');
+  assert.equal(p.postalCode, '99423');
+});
+
+test('Einzeiler nur mit Leerzeichen getrennt', () => {
+  assert.deepEqual(zerlegeEinzeiler('Max Muster Am Steinbruch 12 07743 Jena'), [
+    'Max Muster',
+    'Am Steinbruch 12',
+    '07743 Jena',
+  ]);
+  assert.deepEqual(zerlegeEinzeiler('Musterrat Erika Muster Straße 4 99423 Weimar'), [
+    'Musterrat',
+    'Erika Muster Straße 4',
+    '99423 Weimar',
+  ]);
+  assert.equal(zerlegeEinzeiler('Musterverein e.V.'), null);
+});
+
+test('Eine mehrzeilige Anschrift bleibt, wie sie ist', () => {
+  const p = parseSeite('Erika Musterfrau\nBeispielstraße 39\n07749 Jena');
+  assert.equal(p.address, 'Erika Musterfrau\nBeispielstraße 39\n07749 Jena');
+  assert.ok(!p.notes.some((n) => n.includes('in einer Zeile')));
 });

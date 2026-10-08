@@ -17,8 +17,8 @@ import { recogniseText, engineStatus, ladeBild, dreheBild, DREHUNGEN } from './o
 import {
   parseAddress,
   parseLabel,
-  ohneAnkerbeschriftung,
   parseVermischt,
+  parseSeite,
   ersetzeOrt,
   ersetzePostleitzahl,
 } from './adressen.js';
@@ -936,7 +936,7 @@ async function erkenneMitDrehung(blob, flaeche, anzeige = 0, start = 0) {
       nachdrehen: drehung,
     });
     if (!result) return null;
-    const parsed = parseAddress(ohneAnkerbeschriftung(result.text));
+    const parsed = parseSeite(result.text);
     // Eine gefundene Anschrift wiegt schwerer als ein guter Zuversichtswert:
     // gerade gedrehter Text wird gelegentlich selbstbewusst falsch gelesen.
     const guete = result.confidence + (parsed.postalCode ? 1 : 0) + (parsed.street ? 0.5 : 0);
@@ -1177,7 +1177,7 @@ async function runOcr(file, ziel = 'umschlag', crop = null, drehung = 0) {
     // Beschriftungen als Anker, sonst nach der Umschlagsregel. Ein Bild einer
     // einzelnen Seite ist eine Anschrift und nichts weiter.
     const einzeln = ziel !== 'umschlag';
-    const gelesen = einzeln ? parseAddress(result.text) : parseLabel(result.text);
+    const gelesen = einzeln ? parseSeite(result.text) : parseLabel(result.text);
     const haupt = einzeln ? gelesen : gelesen.empfaenger;
     state.form.ocr = { ...result, parsed: haupt, etikett: einzeln ? null : gelesen };
 
@@ -1315,7 +1315,7 @@ function verarbeiteEingefuegt(seite, text) {
   // Text als ein einzelner Adressblock.
   const vermischt = parseVermischt(roh);
   let zerlegt = vermischt?.[seite];
-  if (!zerlegt?.address) zerlegt = parseAddress(ohneAnkerbeschriftung(roh));
+  if (!zerlegt?.address) zerlegt = parseSeite(roh);
   if (!zerlegt.address) {
     einfuegenStand(seite, 'Im eingefügten Text war keine Anschrift zu erkennen.');
     return false;

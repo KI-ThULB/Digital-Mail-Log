@@ -525,6 +525,10 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--gruen); 
 
 button.ghost.klein { min-height: 40px; font-size: 0.85rem; padding: 0 12px; }
 
+.einfuegen { margin-bottom: 10px; }
+.einfuegen textarea { border-style: dashed; }
+[id$='-einfuegen-stand'] { margin: 0 0 10px; }
+
 .schnellwahl {
   display: flex;
   flex-wrap: wrap;

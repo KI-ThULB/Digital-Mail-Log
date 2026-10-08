@@ -58,6 +58,16 @@ eine App auf dem Bildschirm. Andere Browser bieten das auf dem iPhone nicht an.
    übernimmt den großen Adressblock als Empfänger und eine kleine Zeile darüber
    als Absender. Steht auf der Sendung ausdrücklich „Empfänger“ oder „Absender“
    — wie auf Paketetiketten —, gilt diese Beschriftung.
+
+   **Mit dem iPhone vorlesen lassen.** Die Fotos-App des iPhones liest
+   Umschläge oft besser als die App selbst. Foto in der Fotos-App öffnen, lange
+   auf den Adressblock drücken, nur diesen Block markieren und **„Kopieren“**.
+   Am Mac bei der passenden Seite **„📋 Text einfügen“** wählen. Die App
+   verteilt den Text auf Name, Organisation und Anschrift und prüft die
+   Postleitzahl wie bei einem Foto. Telefon und Mac müssen dafür mit derselben
+   Apple-ID angemeldet sein, das Telefon muss die App aber nicht erreichen.
+   Fragt der Browser, ob die Seite die Zwischenablage lesen darf, bitte
+   zulassen. Sonst öffnet sich ein Feld, in das Sie mit ⌘V einfügen.
 4. **Eigene Stelle antippen.** Über den Feldern der eigenen Seite stehen die
    gemerkten Stellen des Hauses. Ein Tipp füllt Name, Organisation, Anschrift und
    — beim Ausgang — das PSP-Element.

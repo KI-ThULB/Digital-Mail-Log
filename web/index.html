@@ -189,11 +189,23 @@
                   <input id="foto-absender" type="file" accept="image/*" capture="environment" />
                   <span>📷 nur diese Seite</span>
                 </label>
+                <button type="button" class="ghost klein" id="einfuegen-absender"
+                  title="Text aus der Zwischenablage, etwa aus der Texterkennung der Fotos-App">
+                  📋 Text einfügen
+                </button>
                 <button type="button" class="ghost klein" id="merken-absender" hidden>
                   ★ als interne Stelle merken
                 </button>
               </div>
               <div id="absender-schnellwahl" class="schnellwahl" aria-live="polite" hidden></div>
+              <div id="absender-einfuegen" class="einfuegen" hidden>
+                <label class="field field--wide">
+                  <span>Hier einfügen (⌘V bzw. Strg+V)</span>
+                  <textarea id="absender-einfuegen-feld" rows="3"
+                    placeholder="Adressblock aus der Zwischenablage"></textarea>
+                </label>
+              </div>
+              <p id="absender-einfuegen-stand" class="hint" aria-live="polite" hidden></p>
               <div class="grid">
                 <label class="field">
                   <span>Name</span>
@@ -220,11 +232,23 @@
                   <input id="foto-empfaenger" type="file" accept="image/*" capture="environment" />
                   <span>📷 nur diese Seite</span>
                 </label>
+                <button type="button" class="ghost klein" id="einfuegen-empfaenger"
+                  title="Text aus der Zwischenablage, etwa aus der Texterkennung der Fotos-App">
+                  📋 Text einfügen
+                </button>
                 <button type="button" class="ghost klein" id="merken-empfaenger" hidden>
                   ★ als interne Stelle merken
                 </button>
               </div>
               <div id="empfaenger-schnellwahl" class="schnellwahl" aria-live="polite" hidden></div>
+              <div id="empfaenger-einfuegen" class="einfuegen" hidden>
+                <label class="field field--wide">
+                  <span>Hier einfügen (⌘V bzw. Strg+V)</span>
+                  <textarea id="empfaenger-einfuegen-feld" rows="3"
+                    placeholder="Adressblock aus der Zwischenablage"></textarea>
+                </label>
+              </div>
+              <p id="empfaenger-einfuegen-stand" class="hint" aria-live="polite" hidden></p>
               <div class="grid">
                 <label class="field">
                   <span>Name</span>

@@ -671,6 +671,68 @@ class BrowserFlow(unittest.TestCase):
         self.assertNotIn("Hawangen", page.input_value("#absender-adresse"))
         page.wait_for_selector("#absender-pruefung", state="hidden")
 
+    def test_text_einfuegen_aus_der_zwischenablage(self):
+        """Vor-Erkennung außerhalb der App, etwa mit der Fotos-App des iPhones.
+
+        Dort wird nur der Adressblock markiert und kopiert; die App verteilt den
+        Text auf die Felder und prüft die Postleitzahl wie bei einem Foto. Die
+        Anschrift ist erfunden.
+        """
+        kontext = self.browser.new_context(
+            viewport={"width": 414, "height": 896},
+            locale="de-DE",
+            permissions=["clipboard-read", "clipboard-write"],
+        )
+        try:
+            page = kontext.new_page()
+            fehler = []
+            page.on("pageerror", lambda exc: fehler.append(str(exc)))
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.evaluate(
+                "t => navigator.clipboard.writeText(t)",
+                "Herrn\nMax Mustermann\nBeispielstraße 39\n07749 Jena",
+            )
+            page.click("#einfuegen-empfaenger")
+            page.wait_for_selector("#empfaenger-einfuegen-stand:not([hidden])")
+            self.assertEqual(page.input_value("#empfaenger-name"), "Max Mustermann")
+            self.assertEqual(
+                page.input_value("#empfaenger-adresse"),
+                "Max Mustermann\nBeispielstraße 39\n07749 Jena",
+            )
+            self.assertIn("verteilt", page.text_content("#empfaenger-einfuegen-stand"))
+            # Die andere Seite bleibt unberührt.
+            self.assertEqual(page.input_value("#absender-adresse"), "")
+            self.assertEqual(fehler, [])
+        finally:
+            kontext.close()
+
+    def test_text_einfuegen_ohne_zugriff_auf_die_zwischenablage(self):
+        """Verweigert der Browser das Lesen, öffnet sich ein Feld zum Einfügen."""
+        page = self.page
+        page.goto(self.base)
+        page.wait_for_selector("#kennung:not(:empty)")
+        page.click("#neu")
+        page.click("#einfuegen-absender")
+        page.wait_for_selector("#absender-einfuegen:not([hidden])")
+        page.eval_on_selector(
+            "#absender-einfuegen-feld",
+            """(feld, text) => {
+                const daten = new DataTransfer();
+                daten.setData('text/plain', text);
+                feld.dispatchEvent(new ClipboardEvent('paste', { clipboardData: daten, bubbles: true, cancelable: true }));
+            }""",
+            "Musterverlag GmbH\nBeispielweg 3\n99423 WE",
+        )
+        page.wait_for_selector("#absender-einfuegen", state="hidden")
+        self.assertEqual(page.input_value("#absender-org"), "Musterverlag GmbH")
+        self.assertIn("99423 WE", page.input_value("#absender-adresse"))
+        # Die Prüfung greift wie bei einem erkannten Foto.
+        page.wait_for_selector("#absender-pruefung:not([hidden])")
+        self.assertIn("Weimar", page.text_content("#absender-pruefung"))
+        self.assertEqual(self.errors, [])
+
     @unittest.skipUnless(
         TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
     )

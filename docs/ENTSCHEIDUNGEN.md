@@ -380,3 +380,34 @@ in `web/daten/LIZENZ-plz.txt` und in der Fußzeile der Anwendung.
 **Zurückzunehmen, wenn.** Die Einrichtung einen **eigenen** Geokodierdienst
 betreibt und die Datenschutzfrage dafür geklärt ist. Dann träte er als zweite,
 abschaltbare Quelle daneben – nie als Voraussetzung.
+
+## E15 · Fremde Texterkennung als Vor-Erkennung über die Zwischenablage (08.10.2026)
+
+**Entscheidung.** Bei Absender und Empfänger gibt es je einen Knopf
+„📋 Text einfügen“. Er liest die Zwischenablage, verteilt den Text mit dem
+vorhandenen Parser auf Name, Organisation und Anschrift und stößt dieselbe
+Postleitzahlprüfung an wie ein erkanntes Foto. Verweigert der Browser das
+Lesen, öffnet sich ein Feld zum Einfügen mit der Tastatur.
+
+**Anlass.** Die Texterkennung der Fotos-App auf iPhone und Mac (Live Text) liest
+Umschläge spürbar besser als Tesseract im Browser. Wer dort nur den Adressblock
+markiert und kopiert, trifft zugleich die Zuordnung, die sonst das Markieren
+auf dem Foto leistet. Über die gemeinsame Zwischenablage der Apple-Geräte
+gelangt der Text vom Telefon an den Mac, ohne dass das Telefon die App
+erreichen muss. Genau daran war der Einsatz am Telefon im Uni-WLAN gescheitert.
+
+**Warum das mit E14 vereinbar ist.** Live Text arbeitet laut Apple auf dem
+Gerät. Die gemeinsame Zwischenablage überträgt verschlüsselt zwischen den
+Geräten derselben Apple-ID. Die App selbst schickt nichts nach außen. Ob
+dienstliche Geräte diese Funktionen nutzen dürfen, entscheidet die IT der
+Einrichtung. Verwaltete Geräte können sie abschalten, dann bleibt der Weg über
+das Foto.
+
+**Grenzen.** Eingefügter Text hat keinen Zuversichtswert. Er gilt wie ein
+markierter Bereich, weil die Auswahl eine bewusste war. Gefüllte Felder werden
+nicht überschrieben, das Erkannte wird wie bei der Fotoerkennung zur Übernahme
+angeboten.
+
+**Zurückzunehmen, wenn.** Die eingebaute Erkennung im Pilotbetrieb gleichauf
+liegt. Dann wäre der Knopf ein zweiter Weg ohne Mehrwert.
+

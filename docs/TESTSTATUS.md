@@ -11,8 +11,8 @@ Stand 08.10.2026.
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
 | Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 48 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 14 | bestanden |
-| **Summe** | **150** | **bestanden** |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 16 | bestanden |
+| **Summe** | **152** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.

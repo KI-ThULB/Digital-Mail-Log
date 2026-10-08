@@ -14,6 +14,7 @@ dabei die Markdown-Datei; sie wird nicht doppelt gepflegt.
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 
 HIER = Path(__file__).resolve().parent
@@ -37,6 +38,13 @@ def markdown_zu_html(quelle: Path) -> str:
     import markdown
 
     text = quelle.read_text("utf-8")
+    # Python-Markdown verlangt vier Leerzeichen für Absätze innerhalb eines
+    # Listenpunkts, die Quelle rückt wie üblich um drei ein. Ohne Angleichung
+    # zerfiel die nummerierte Anleitung im PDF in Fließtext.
+    text = re.sub(r"(?m)^   (?=\S)", "    ", text)
+    # Folgt ein neuer Punkt direkt auf einen eingerückten Absatz, hielte
+    # Python-Markdown ihn für dessen Fortsetzung.
+    text = re.sub(r"(?m)^(    \S.*\n)(?=\d+\. )", r"\1\n", text)
     inhalt = markdown.markdown(text, extensions=["tables", "sane_lists", "attr_list"])
     titel = text.lstrip().splitlines()[0].lstrip("# ").strip()
     return RAHMEN.format(titel=titel, inhalt=inhalt)

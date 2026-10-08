@@ -264,8 +264,14 @@ function fillForm(form) {
   $('formular-fehler').hidden = true;
   $('ocr-ergebnis').hidden = true;
   $('richtung-warnung').hidden = true;
-  $('absender-vorschlaege').replaceChildren();
-  $('empfaenger-vorschlaege').replaceChildren();
+  for (const seite of ['absender', 'empfaenger']) {
+    $(`${seite}-vorschlaege`).replaceChildren();
+    zeigeUebernahme(seite, []);
+    $(`${seite}-pruefung`).hidden = true;
+    $(`${seite}-einfuegen`).hidden = true;
+    $(`${seite}-einfuegen-feld`).value = '';
+    einfuegenStand(seite, '');
+  }
   applyDirection(form.direction, { silent: true });
   renderPhotoThumbs();
 }
@@ -1274,6 +1280,104 @@ function zeigeUebernahme(seite, abweichend) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Text einfügen – Vor-Erkennung außerhalb der App
+ *
+ * Die Texterkennung der Fotos-App auf iPhone und Mac liest Umschläge deutlich
+ * besser als Tesseract im Browser, und sie läuft ebenfalls auf dem Gerät. Wer
+ * dort nur den Adressblock markiert und kopiert, hat damit zugleich die
+ * Zuordnung getroffen – dasselbe, was das Markieren auf dem Foto leistet.
+ *
+ * Vom Telefon an den Mac gelangt der Text über die gemeinsame Zwischenablage
+ * der Apple-Geräte. Das Telefon muss die App dafür nicht erreichen – genau das
+ * war im Uni-WLAN und im Hotspot gescheitert.
+ *
+ * Der eingefügte Text läuft durch denselben Parser und dieselbe Prüfung wie
+ * ein erkanntes Foto. Er gilt wie ein markierter Bereich: eine Zuversicht gibt
+ * es nicht, die Auswahl war eine bewusste.
+ * ------------------------------------------------------------------ */
+
+function einfuegenStand(seite, text) {
+  const stand = $(`${seite}-einfuegen-stand`);
+  stand.textContent = text;
+  stand.hidden = !text;
+}
+
+/** Verteilt eingefügten Text auf die Felder einer Seite. */
+function verarbeiteEingefuegt(seite, text) {
+  const roh = (text || '').replace(/\r\n?/g, '\n').trim();
+  if (!roh) {
+    einfuegenStand(seite, 'Die Zwischenablage ist leer.');
+    return false;
+  }
+  const zerlegt = parseAddress(ohneAnkerbeschriftung(roh));
+  if (!zerlegt.address) {
+    einfuegenStand(seite, 'Im eingefügten Text war keine Anschrift zu erkennen.');
+    return false;
+  }
+  const wirkung = fuelleSeite(seite, zerlegt);
+  if (zerlegt.shipmentType && !$('art').value) $('art').value = zerlegt.shipmentType;
+  if (wirkung.uebernommen) state.dirty = true;
+
+  $('ocr-text').textContent = `— ${ZIELWORT[seite]} (eingefügt) —\n${roh}`;
+  $('ocr-herkunft').textContent = zerlegt.notes.join(' ');
+  $('ocr-ergebnis').hidden = false;
+
+  $(`${seite}-einfuegen`).hidden = true;
+  $(`${seite}-einfuegen-feld`).value = '';
+  einfuegenStand(
+    seite,
+    wirkung.uebernommen
+      ? 'Eingefügt und auf die Felder verteilt. Bitte prüfen.'
+      : wirkung.offen
+        ? 'Eingefügt. Die Felder waren schon gefüllt – die Übernahme wird unten angeboten.'
+        : 'Eingefügt. Die Felder stimmen bereits.',
+  );
+  return true;
+}
+
+/**
+ * Liest die Zwischenablage. Wo der Browser das nicht erlaubt oder die Nachfrage
+ * abgelehnt wird, öffnet sich ein Feld zum Einfügen mit der Tastatur – der Weg
+ * funktioniert dann trotzdem, nur mit einem Handgriff mehr.
+ */
+async function einfuegen(seite) {
+  einfuegenStand(seite, '');
+  if (navigator.clipboard?.readText) {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        verarbeiteEingefuegt(seite, text);
+        return;
+      }
+    } catch {
+      // abgelehnt oder nicht erlaubt – dann eben von Hand einfügen
+    }
+  }
+  $(`${seite}-einfuegen`).hidden = false;
+  $(`${seite}-einfuegen-feld`).focus();
+}
+
+function wireEinfuegen() {
+  for (const seite of ['absender', 'empfaenger']) {
+    $(`einfuegen-${seite}`).addEventListener('click', () => einfuegen(seite));
+    const feld = $(`${seite}-einfuegen-feld`);
+    feld.addEventListener('paste', (event) => {
+      const text = event.clipboardData?.getData('text/plain');
+      if (!text) return;
+      event.preventDefault();
+      verarbeiteEingefuegt(seite, text);
+    });
+    // Wer tippt statt einfügt, schließt mit Strg/⌘+Eingabe ab.
+    feld.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        verarbeiteEingefuegt(seite, feld.value);
+      }
+    });
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * Plausibilitätsprüfung der Anschrift
  *
  * Die Postleitzahl ist fünfstellig, gut lesbar und eindeutig – sie weiß, wie
@@ -1756,6 +1860,7 @@ async function start() {
   wire();
   wireZuschnitt();
   wireKamera();
+  wireEinfuegen();
   // Die Postleitzahltabelle ist eine Hilfe, keine Voraussetzung: fehlt sie,
   // bleibt die Prüfung stumm und alles andere funktioniert weiter.
   ladeTabelle().catch(() => {});

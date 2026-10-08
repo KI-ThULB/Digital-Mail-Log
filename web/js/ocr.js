@@ -71,8 +71,211 @@ export function dreheBild(bild, grad) {
   return leinwand;
 }
 
+/* ------------------------------------------------------------------ *
+ * Kleine und schiefe Schrift im markierten Bereich
+ *
+ * Anlass war die einzeilige Absenderangabe auf Briefen. Sie ist die kleinste
+ * Schrift auf dem Umschlag, meist unterstrichen, und ein von Hand gehaltenes
+ * Foto steht nie ganz gerade. Gemessen an erzeugten Briefen in der Auflösung
+ * einer angeschlossenen Kamera:
+ *
+ * - Bei sieben bis elf Pixeln Schrifthöhe las die Erkennung Ziffern falsch
+ *   („98423“ statt „99423“) oder gar nichts, bei rund dreißig Pixeln dieselbe
+ *   Zeile richtig.
+ * - Schon bei anderthalb Grad Schräglage las sie die unterstrichene Zeile
+ *   doppelt, weil sie die Unterstreichung für eine zweite Zeile hielt, oder
+ *   sie lieferte nach dem Vergrößern nichts mehr.
+ *
+ * Deshalb wird ein markierter Bereich erst gerade gestellt und dann, wenn
+ * die Schrift klein ist, vergrößert. Beides gilt nur für markierte Bereiche:
+ * Im ganzen Bild stehen Schriften aller Größen und Richtungen nebeneinander,
+ * und eine Messung über alles sagt dort wenig.
+ * ------------------------------------------------------------------ */
+
+/** Schrifthöhe in Pixeln, bei der die Erkennung am sichersten liest. */
+const ZIELHOEHE = 30;
+/** Darunter wird ein markierter Bereich vergrößert. */
+const KLEINE_SCHRIFT = 20;
+/** Mehr als das Vierfache erfindet nur Unschärfe. */
+const HOECHSTE_VERGROESSERUNG = 4;
+/** Bis zu dieser Schräglage wird gesucht. Mehr ist eine Frage der Drehung. */
+const HOECHSTE_SCHRAEGLAGE = 6;
+
 /**
- * Verkleinert und entsättigt das Bild. Das beschleunigt die Erkennung deutlich.
+ * Trennt Schrift von Papier in einem entsättigten Bild.
+ *
+ * @param pixels RGBA-Werte, Rot gleich Grün gleich Blau.
+ * @returns {{schwelle:number, papier:number}|null} ``null``, wenn sich keine
+ *          Schrift vom Papier abhebt.
+ */
+function trenneSchrift(pixels) {
+  const haeufigkeit = new Uint32Array(256);
+  for (let i = 0; i < pixels.length; i += 4) haeufigkeit[pixels[i]] += 1;
+  const anteil = (quote) => {
+    let summe = 0;
+    const grenze = (pixels.length / 4) * quote;
+    for (let wert = 0; wert < 256; wert += 1) {
+      summe += haeufigkeit[wert];
+      if (summe >= grenze) return wert;
+    }
+    return 255;
+  };
+  const dunkel = anteil(0.02);
+  const papier = anteil(0.9);
+  if (papier - dunkel < 40) return null;
+  return { schwelle: (dunkel + papier) / 2, papier };
+}
+
+/**
+ * Schätzt die Höhe einer Textzeile in einem entsättigten, gerade stehenden Bild.
+ *
+ * Gezählt wird, in welchen Bildzeilen Schrift steht: dunkle Punkte, aber
+ * nicht über die ganze Breite, denn das wäre eine Linie oder ein Rand.
+ * Zusammenhängende Bildzeilen mit Schrift ergeben je eine Textzeile, der
+ * Median ihrer Höhen ist das Ergebnis.
+ *
+ * @returns {number} Höhe in Pixeln, 0 wenn sich keine Schrift abzeichnet.
+ */
+export function schaetzeZeilenhoehe(pixels, breite, hoehe) {
+  const schrift = trenneSchrift(pixels);
+  if (!schrift) return 0;
+  const laeufe = [];
+  let beginn = -1;
+  for (let y = 0; y <= hoehe; y += 1) {
+    let tinte = 0;
+    if (y < hoehe) {
+      for (let x = 0; x < breite; x += 1) {
+        if (pixels[(y * breite + x) * 4] < schrift.schwelle) tinte += 1;
+      }
+    }
+    const beschrieben = tinte >= Math.max(2, breite * 0.01) && tinte <= breite * 0.6;
+    if (beschrieben && beginn === -1) beginn = y;
+    if (!beschrieben && beginn !== -1) {
+      if (y - beginn >= 3) laeufe.push(y - beginn);
+      beginn = -1;
+    }
+  }
+  if (!laeufe.length) return 0;
+  laeufe.sort((a, b) => a - b);
+  return laeufe[Math.floor(laeufe.length / 2)];
+}
+
+/**
+ * Schätzt, um wie viel Grad die Zeilen eines Bildes schief stehen.
+ *
+ * Stehen die Zeilen gerade, fällt die Schrift auf wenige Bildzeilen und
+ * dazwischen bleibt es leer. Für jeden Probewinkel wird deshalb gezählt, wie
+ * ungleich sich die dunklen Punkte auf die Bildzeilen verteilen. Der Winkel
+ * mit der größten Ungleichheit ist die Schräglage.
+ *
+ * @returns {number} Winkel in Grad, positiv, wenn die Zeile nach rechts
+ *          abfällt. 0, wenn nichts zu messen ist oder das Bild gerade steht.
+ */
+export function schaetzeSchraeglage(pixels, breite, hoehe) {
+  const schrift = trenneSchrift(pixels);
+  if (!schrift) return 0;
+  // Für die Schätzung genügt eine Stichprobe der dunklen Punkte.
+  const schritt = Math.max(1, Math.floor(Math.sqrt((breite * hoehe) / 400000)));
+  const xs = [];
+  const ys = [];
+  for (let y = 0; y < hoehe; y += schritt) {
+    for (let x = 0; x < breite; x += schritt) {
+      if (pixels[(y * breite + x) * 4] < schrift.schwelle) {
+        xs.push(x);
+        ys.push(y);
+      }
+    }
+  }
+  if (xs.length < 50) return 0;
+
+  const faecher = new Float64Array(Math.ceil((hoehe + breite) / schritt) + 2);
+  const versatz = breite;
+  const ungleichheit = (grad) => {
+    const steigung = Math.tan((grad * Math.PI) / 180);
+    faecher.fill(0);
+    for (let i = 0; i < xs.length; i += 1) {
+      faecher[Math.round((ys[i] - xs[i] * steigung + versatz * Math.abs(steigung)) / schritt)] += 1;
+    }
+    let summe = 0;
+    for (let i = 0; i < faecher.length; i += 1) summe += faecher[i] * faecher[i];
+    return summe;
+  };
+
+  const gerade = ungleichheit(0);
+  let bester = 0;
+  let wert = gerade;
+  const suche = (von, bis, weite) => {
+    for (let grad = von; grad <= bis + 1e-9; grad += weite) {
+      const probe = ungleichheit(grad);
+      if (probe > wert) {
+        wert = probe;
+        bester = grad;
+      }
+    }
+  };
+  suche(-HOECHSTE_SCHRAEGLAGE, HOECHSTE_SCHRAEGLAGE, 0.5);
+  suche(bester - 0.4, bester + 0.4, 0.1);
+  // Ein knapper Vorsprung ist Zufall. Dann bleibt das Bild, wie es ist.
+  if (wert < gerade * 1.05 || Math.abs(bester) < 0.3) return 0;
+  return Math.round(bester * 10) / 10;
+}
+
+/** Zeichnet eine Fläche gerade gestellt und vergrößert neu, auf Papiergrund. */
+function richteAus(flaeche, schraeglage, faktor, papier) {
+  const ziel = Object.assign(document.createElement('canvas'), {
+    width: Math.max(1, Math.round(flaeche.width * faktor)),
+    height: Math.max(1, Math.round(flaeche.height * faktor)),
+  });
+  const stift = ziel.getContext('2d', { willReadFrequently: true });
+  // Die Ecken, die beim Drehen frei werden, bekommen die Farbe des Papiers.
+  // Schwarze Keile läse die Erkennung als Zeichen.
+  stift.fillStyle = `rgb(${papier},${papier},${papier})`;
+  stift.fillRect(0, 0, ziel.width, ziel.height);
+  stift.imageSmoothingQuality = 'high';
+  stift.translate(ziel.width / 2, ziel.height / 2);
+  stift.rotate((-schraeglage * Math.PI) / 180);
+  stift.scale(faktor, faktor);
+  stift.drawImage(flaeche, -flaeche.width / 2, -flaeche.height / 2);
+  return ziel;
+}
+
+/**
+ * Stellt einen markierten Bereich gerade und vergrößert kleine Schrift.
+ * Gibt die Fläche unverändert zurück, wenn nichts zu tun ist.
+ */
+function bereiteBereichAuf(flaeche, maxEdge) {
+  const lies = (c) => c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data;
+  const pixels = lies(flaeche);
+  const schrift = trenneSchrift(pixels);
+  if (!schrift) return flaeche;
+
+  // Gemessen wird in Leserichtung, also nach der Suchdrehung. Steht der Text
+  // hochkant, findet sich keine Schräglage und nur ein einziger hoher Lauf,
+  // und es geschieht nichts.
+  const schraeglage = schaetzeSchraeglage(pixels, flaeche.width, flaeche.height);
+  const gerade = schraeglage ? richteAus(flaeche, schraeglage, 1, schrift.papier) : flaeche;
+  const zeilenhoehe = schaetzeZeilenhoehe(
+    schraeglage ? lies(gerade) : pixels,
+    gerade.width,
+    gerade.height,
+  );
+
+  let faktor = 1;
+  if (zeilenhoehe > 0 && zeilenhoehe < KLEINE_SCHRIFT) {
+    faktor = Math.min(
+      ZIELHOEHE / zeilenhoehe,
+      HOECHSTE_VERGROESSERUNG,
+      (maxEdge * 1.5) / Math.max(flaeche.width, flaeche.height),
+    );
+  }
+  if (faktor < 1.2) return gerade;
+  // In einem Zug aus der Ausgangsfläche, damit nicht zweimal gerechnet wird.
+  return richteAus(flaeche, schraeglage, faktor, schrift.papier);
+}
+
+/**
+ * Bereitet das Bild für die Erkennung vor: Ausschnitt, Größe, Graustufen.
+ * Große Bilder werden verkleinert, das beschleunigt die Erkennung deutlich.
  *
  * @param options.rotate Drehung in Grad (0, 90, 180, 270), vor dem Ausschnitt
  *        angewandt. Der Ausschnitt gilt also im gedrehten Bild – so, wie die
@@ -81,10 +284,12 @@ export function dreheBild(bild, grad) {
  *        von der Auflösung: ``{x, y, w, h}``. Gemessen an einem Paketetikett
  *        brachte der Ausschnitt mehr als jede andere Maßnahme: 28 % Zuversicht
  *        in 4,1 s für das ganze Etikett, 62 % in 0,5 s für den Adressblock.
+ * @param options.aufbereiten Markierten Bereich gerade stellen und kleine
+ *        Schrift vergrößern. Nur mit ``crop`` wirksam.
  */
 export async function prepareImage(
   blob,
-  { maxEdge = 1600, contrast = 1.25, crop = null, rotate = 0, nachdrehen = 0 } = {},
+  { maxEdge = 1600, contrast = 1.25, crop = null, rotate = 0, nachdrehen = 0, aufbereiten = true } = {},
 ) {
   const geladen = await ladeBild(blob);
   const quelle = rotate % 360 === 0 ? geladen : dreheBild(geladen, rotate);
@@ -125,7 +330,8 @@ export async function prepareImage(
   }
   context.putImageData(image, 0, 0);
 
-  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  const fertig = crop && aufbereiten ? bereiteBereichAuf(canvas, maxEdge) : canvas;
+  return new Promise((resolve) => fertig.toBlob(resolve, 'image/png'));
 }
 
 /** Texterkennung des Betriebssystems, sofern der Browser sie anbietet. */
@@ -261,7 +467,13 @@ export async function recogniseText(blob, options = {}) {
   const engine = options.engine || (await chooseEngine());
   if (!engine) return null;
   const prepared = options.raw ? blob : await prepareImage(blob, options);
-  return engine.recognise(prepared);
+  const result = await engine.recognise(prepared);
+  // Das Aufbereiten darf nie schlechter sein als gar nichts: Bleibt der Text
+  // danach leer, wird der Bereich noch einmal so gelesen, wie er ist.
+  if (!options.raw && options.crop && options.aufbereiten !== false && !(result.text || '').trim()) {
+    return engine.recognise(await prepareImage(blob, { ...options, aufbereiten: false }));
+  }
+  return result;
 }
 
 export const engines = { platformOcr, tesseractOcr };

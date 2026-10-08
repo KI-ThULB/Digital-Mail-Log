@@ -19,6 +19,7 @@ import {
   parseLabel,
   parseVermischt,
   parseSeite,
+  zerlegeEinzeiler,
   ersetzeOrt,
   ersetzePostleitzahl,
 } from './adressen.js';
@@ -1544,11 +1545,11 @@ function applySuggestion(gelesen, ziel = 'umschlag', erkennung = { confidence: 1
       etwas = etwas || wirkung.uebernommen;
       offen += wirkung.offen;
     } else if (!gelesen.ankerGefunden && gelesen.empfaenger.returnLine) {
-      // Die Rücksendezeile des Fensterumschlags steht in einer Zeile. Ließ sie
-      // sich nicht zerlegen, wandert sie unzerlegt in das Anschriftenfeld.
-      const zeilen = gelesen.empfaenger.returnLine
-        .replace(/\s*[·•]\s*/g, '\n')
-        .replace(/\s+[-–]\s+/g, '\n');
+      // Die Rücksendezeile des Fensterumschlags steht in einer Zeile. Trägt
+      // ihre Zerlegung nicht, wandert sie nur als Anschrift in das Feld, in
+      // Zeilen geteilt wie überall sonst.
+      const roh = gelesen.empfaenger.returnLine;
+      const zeilen = (zerlegeEinzeiler(roh) || [roh]).join('\n');
       const wirkung = fuelleSeite('absender', { address: zeilen });
       etwas = etwas || wirkung.uebernommen;
       offen += wirkung.offen;

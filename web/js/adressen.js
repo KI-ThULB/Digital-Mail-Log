@@ -300,15 +300,28 @@ export function looksLikeOrganisation(line) {
 /**
  * Trennt die Rücksendezeile des Fensterumschlags von der eigentlichen Anschrift.
  * Diese Zeile steht klein über dem Adressfeld und enthält die Anschrift des
- * Absenders in einer Zeile, getrennt durch Punkte, Kommas oder Mittelpunkte.
+ * Absenders in einer Zeile.
+ *
+ * Woran sie zu erkennen ist, entscheidet ``zerlegeEinzeiler``: die
+ * Postleitzahl steht mitten in der Zeile, davor Name oder Straße. Früher
+ * galt nur, was einen Mittelpunkt oder Gedankenstrich enthielt. Die
+ * Erkennung liest den Mittelpunkt aber oft als Doppelpunkt oder gar nicht,
+ * und dann blieb die Absenderzeile im Block des Empfängers stehen.
+ *
+ * Ohne die klassischen Trennzeichen gilt eine Zeile nur dann als
+ * Rücksendezeile, wenn darunter noch eine eigene Postleitzahlzeile folgt.
+ * Sonst wäre „Beispielweg 3, 07743 Jena“ als letzte Zeile des Empfängers
+ * fälschlich der Absender.
  */
 export function splitReturnLine(lines) {
-  const index = lines.findIndex(
-    (line) =>
-      /\d{5}\s+\S/.test(line) &&
+  const index = lines.findIndex((line, i) => {
+    if (!zerlegeEinzeiler(line)) return false;
+    const klassisch =
       (line.match(/[·•]/g) || []).length + (line.match(/\s[-–]\s/g) || []).length >= 1 &&
-      line.length > 25,
-  );
+      line.length > 25;
+    if (klassisch) return true;
+    return lines.slice(i + 1).some((spaeter) => findePostleitzahl(spaeter));
+  });
   if (index === -1 || index > 2) return { returnLine: '', rest: lines };
   return { returnLine: lines[index], rest: lines.filter((_, i) => i !== index) };
 }
@@ -407,9 +420,9 @@ export function parseLabel(text) {
 
   if (!teile.gefunden) {
     const ganz = parseAddress(text);
-    const rueck = ganz.returnLine
-      ? parseAddress(ganz.returnLine.replace(/\s*[·•]\s*/g, '\n').replace(/\s+[-–]\s+/g, '\n'))
-      : leeresErgebnis();
+    // Die Rücksendezeile ist der Absender in einer Zeile. Zerlegt wird sie an
+    // derselben Stelle wie ein markierter Absenderbereich.
+    const rueck = ganz.returnLine ? parseSeite(ganz.returnLine) : leeresErgebnis();
     return {
       empfaenger: ganz,
       absender: rueck,
@@ -419,8 +432,11 @@ export function parseLabel(text) {
     };
   }
 
-  const empfaenger = parseAddress(teile.empfaenger.join('\n'));
-  const absender = parseAddress(teile.absender.join('\n'));
+  // Ein Block hinter einer Beschriftung gehört zu genau einer Seite. Steht
+  // dort die Anschrift in einer Zeile, ist sie die Anschrift und keine
+  // Rücksendezeile.
+  const empfaenger = parseSeite(teile.empfaenger.join('\n'));
+  const absender = parseSeite(teile.absender.join('\n'));
   const notes = [];
   if (verworfen) notes.push(`${verworfen} unlesbare Zeilen übergangen.`);
   notes.push('Beschriftungen „Empfänger“ und „Absender“ wurden als Anker genutzt.');
@@ -758,81 +774,179 @@ export function ohneAnkerbeschriftung(text) {
     .join('\n');
 }
 
+/* ------------------------------------------------------------------ *
+ * Anschrift in einer Zeile
+ *
+ * Absender stehen auf Briefen meist in einer Zeile: „Musterverein e.V. ·
+ * Beispielweg 3 · 99423 Weimar“. Am gedruckten Brief kommt davon selten
+ * genau das an. Gemessen an erzeugten Streifen in Briefgröße liest die
+ * Erkennung den Mittelpunkt als „-“, „:“, „+“, „_“ oder gar nicht, auch
+ * gemischt in derselben Zeile, und klebt ihn gelegentlich an das nächste
+ * Wort („-Beispielweg“). Eine Liste erwarteter Trennzeichen, der Reihe nach
+ * probiert, trägt deshalb nicht.
+ *
+ * Verlässlich ist der Aufbau: Die Postleitzahl mit dem Ort steht hinten,
+ * davor die Straße mit Hausnummer, davor der Name. Zerlegt wird also zuerst
+ * an der Postleitzahl, dann an allem, was wie ein Trennzeichen dasteht, und
+ * wo keines stand, an der Hausnummer.
+ * ------------------------------------------------------------------ */
+
+/** Vorwörter, die zum Straßennamen gehören: „Am Steinbruch“, „Zur Alten Mühle“. */
+const STRASSENVORWORT = /^(am|an|auf|im|in|zum|zur|zu|unter|unterm|hinter|vor|bei|beim|alte[nr]?|neue[nr]?|gro(ß|ss)e[nr]?|kleine[nr]?|obere[nr]?|untere[nr]?|st\.?)$/i;
+
+/**
+ * Sucht die Postleitzahl einer deutschen Anschrift irgendwo in der Zeile.
+ *
+ * Es gilt die letzte Fundstelle, denn die Postleitzahl steht hinten. Die
+ * üblichen Verwechslungen („O7743“) zählen mit, solange mindestens drei
+ * echte Ziffern darunter sind.
+ *
+ * @returns {{index:number}|null} Stelle, an der die Postleitzahlzeile beginnt.
+ */
+function findePostleitzahl(text) {
+  let fund = null;
+  const muster = /(^|\s)((?:(?:d|de)\s*-\s*)?)([0-9OoDQIlSBZ]{5})(?=[\s-]*[A-Za-zÄÖÜäöüß]{2})/gi;
+  for (const treffer of (text || '').matchAll(muster)) {
+    if ((treffer[3].match(/\d/g) || []).length < 3) continue;
+    fund = { index: treffer.index + treffer[1].length };
+  }
+  return fund;
+}
+
+/** Teilt einen Text an allem, was wie ein Trennzeichen zwischen Angaben steht. */
+function teileAnTrennzeichen(text) {
+  return (text || '')
+    // „12 - 14“ ist eine Hausnummer und keine Trennstelle.
+    .replace(/(\d)\s+[-–]\s+(\d{1,3}[a-zA-Z]?)(?![\d\p{L}])/gu, '$1-$2')
+    // Zeichen, die in einer Anschrift nur als Trenner vorkommen.
+    .replace(/\s*[·•∙●▪■¦|;]+\s*/g, '\n')
+    .replace(/\s*,\s*/g, '\n')
+    // Unterstreichungen liest die Erkennung als Unterstriche.
+    .replace(/_+\s+|\s+_+/g, '\n')
+    // Frei stehende Satzzeichen: „e.V. - Beispielweg“, „e.V. : Beispielweg“.
+    .replace(/\s+[-–—:+*~=.°/\\]+\s+/g, '\n')
+    // An das folgende Wort geklebt: „e.V. -Beispielweg“.
+    .replace(/\s+[-–—:+*]+(?=[A-ZÄÖÜ0-9])/g, '\n')
+    // An das vorige Wort geklebt: „e.V.- Beispielweg“. Nur vor Großbuchstabe
+    // oder Ziffer, damit „Universitäts- und Landesbibliothek“ ganz bleibt.
+    .replace(/(?<=[\p{L}\p{N}.)])[-–—:]\s+(?=[A-ZÄÖÜ0-9])/gu, '\n')
+    .split('\n')
+    .map((teil) =>
+      teil
+        .replace(/^[^\p{L}\p{N}]+/u, '')
+        .replace(/[^\p{L}\p{N}.)]+$/u, '')
+        // „Beispielweg 3.“ – der Punkt hinter der Hausnummer ist Rand.
+        .replace(/(?<=\d)\.$/, '')
+        .trim(),
+    )
+    .filter(Boolean);
+}
+
+/**
+ * Löst die Straße mit Hausnummer vom Namen davor, wenn kein Trennzeichen
+ * dazwischen stand: „Max Muster Am Steinbruch 12“.
+ *
+ * @returns {string[]} Name und Straße, oder nur der Text, wenn nichts zu
+ *          trennen war.
+ */
+function trenneStrasseAb(text) {
+  const postfach = text.match(/^(.*?)\s+(post(?:fach|schlie(?:ß|ss)fach)\s*[\d\s]{2,})$/i);
+  if (postfach && postfach[1]) return [postfach[1], postfach[2]];
+
+  const mitNummer = text.match(/^(.*\S)\s+(\d+\s?[a-zA-Z]?(?:\s?[-/]\s?\d+\s?[a-zA-Z]?)?)$/);
+  if (!mitNummer) return [text];
+  const woerter = mitNummer[1].split(/\s+/);
+  if (woerter.length < 2) return [text];
+
+  // Der Straßenname ist das Wort vor der Hausnummer. Ist es selbst nur die
+  // Endung („Rudolf Breitscheid Straße 4“), gehören bis zu zwei Wörter davor
+  // dazu, aber nie über eine Rechtsform hinweg („GmbH Lange Straße 4“).
+  let beginn = woerter.length - 1;
+  if (STRASSENENDUNGEN.includes(woerter[beginn].toLowerCase())) {
+    let genommen = 0;
+    while (
+      beginn > 1 &&
+      genommen < 2 &&
+      /^[A-ZÄÖÜ]/.test(woerter[beginn - 1]) &&
+      !RECHTSFORMEN.includes(woerter[beginn - 1].toLowerCase())
+    ) {
+      beginn -= 1;
+      genommen += 1;
+    }
+  }
+  while (beginn > 1 && STRASSENVORWORT.test(woerter[beginn - 1])) beginn -= 1;
+  if (beginn < 1) return [text];
+  return [woerter.slice(0, beginn).join(' '), `${woerter.slice(beginn).join(' ')} ${mitNummer[2]}`];
+}
+
 /**
  * Zerlegt eine einzeilige Anschrift in ihre Zeilen.
  *
- * Absender stehen auf Briefen oft in einer Zeile: „Musterverein e.V. ·
- * Beispielweg 3 · 99423 Weimar“, mit Mittelpunkt, Gedankenstrich, Komma oder
- * nur mit Leerzeichen getrennt. Gibt ``null`` zurück, wenn sich keine
- * Postleitzahlzeile herauslösen lässt.
+ * Gibt ``null`` zurück, wenn die Zeile keine einzeilige Anschrift ist: wenn
+ * sich keine Postleitzahl findet oder vor ihr nichts steht. „07743 Jena“ und
+ * „D-07743 Jena“ sind gewöhnliche Zeilen und bleiben, wie sie sind.
  */
 export function zerlegeEinzeiler(zeile) {
-  const text = (zeile || '').trim();
-  if (!/\d{5}\s*[A-Za-zÄÖÜäöüß]/.test(glaetteZiffern(text)) && !/\d{5}\s*[A-Za-zÄÖÜäöüß]/.test(text)) {
-    return null;
-  }
-  for (const trenner of [/\s*[·•]\s*/, /\s+[-–—]\s+/, /\s*;\s*/, /\s*,\s*/, /\s+\/\s+/]) {
-    const teile = text.split(trenner).map((t) => t.trim()).filter(Boolean);
-    if (teile.length >= 2 && teile.some((t) => matchPostalLine(t))) return teile;
-  }
-  // Nur Leerzeichen: vor der Postleitzahl trennen, dann die Straße mit
-  // Hausnummer vom Namen davor.
-  const plz = text.match(/^(.*?)\s+((?:(?:D|DE)\s*-\s*)?\d{5}\s*[A-Za-zÄÖÜäöüß].*)$/);
-  if (!plz || !plz[1]) return null;
-  const kopf = plz[1];
-  const woerter = kopf.split(/\s+/);
-  // Die Hausnummer ist das letzte Wort davor.
-  if (woerter.length >= 3 && /^\d+\s*[a-zA-Z]?$/.test(woerter[woerter.length - 1])) {
-    const nummer = woerter[woerter.length - 1];
-    // „Am Steinbruch 12“, „Zur Alten Mühle 3“: das Vorwort gehört zur Straße.
-    const VORWORT = /^(am|an|auf|im|in|zum|zur|zu|unter|hinter|vor|bei|beim|alte[nr]?|neue[nr]?|gro(ß|ss)e[nr]?|kleine[nr]?|obere[nr]?|untere[nr]?|st\.?)$/i;
-    const mitVorwort = (start) => {
-      let b = start;
-      while (b > 1 && VORWORT.test(woerter[b - 1])) b -= 1;
-      return b;
-    };
-    // Der Straßenname ist das Wort vor der Hausnummer, samt Vorwörtern. Ist
-    // es selbst nur die Endung („Rudolf Breitscheid Straße 4“), gehören bis
-    // zu zwei Wörter davor dazu.
-    let start = woerter.length - 2;
-    if (STRASSENENDUNGEN.includes(woerter[start].toLowerCase())) {
-      start = Math.max(1, start - 2);
-    }
-    const beginn = mitVorwort(start);
-    return [woerter.slice(0, beginn).join(' '), `${woerter.slice(beginn, -1).join(' ')} ${nummer}`, plz[2]];
-  }
-  return [kopf, plz[2]];
+  const text = (zeile || '').trim().replace(/^abs(?:ender)?(?:\s*[.:,;]+\s*|\s+)/i, '');
+  const stelle = findePostleitzahl(text);
+  if (!stelle) return null;
+
+  const kopf = teileAnTrennzeichen(text.slice(0, stelle.index));
+  // Vor der Postleitzahl muss ein richtiges Wort stehen. Ein Länderkürzel
+  // („DE 07743 Jena“) oder ein Erkennungsrest macht keine Anschrift.
+  if (!kopf.some((teil) => /[A-Za-zÄÖÜäöüß]{3,}/.test(teil))) return null;
+  const [ort, ...danach] = teileAnTrennzeichen(text.slice(stelle.index));
+  if (!ort) return null;
+
+  // Stand zwischen Name und Straße kein Trennzeichen, trennt die Hausnummer.
+  const vorne = kopf.length === 1 ? trenneStrasseAb(kopf[0]) : kopf;
+  return [...vorne, ort, ...danach];
 }
 
 /**
  * Zerlegt den Text **einer** Seite – einen markierten Bereich, ein Foto nur
- * dieser Seite oder eingefügten Text.
+ * dieser Seite, eingefügten Text oder die Rücksendezeile des Umschlags.
  *
  * Anlass: ein Brief, bei dem der Absenderbereich sauber markiert war. Die
  * einzige Zeile darin war die einzeilige Absenderangabe, und ``parseAddress``
  * legte sie – für den ganzen Umschlag zu Recht – als Rücksendezeile beiseite.
  * Für die Anschrift blieb nichts übrig. Wer eine Seite markiert, meint aber
  * genau diese Zeile.
+ *
+ * Steht auf der Seite keine gewöhnliche Postleitzahlzeile, ist die Zeile mit
+ * der Postleitzahl in der Mitte die Anschrift selbst und wird vor dem
+ * Zerlegen in ihre Zeilen entfaltet. Das gilt auch für die halbe Form
+ * „Musterverein e.V.“ und darunter „Beispielweg 3, 99423 Weimar“.
+ *
+ * Steht dagegen ein gewöhnlicher Block mit eigener Postleitzahlzeile da,
+ * wurde großzügig markiert und die Rücksendezeile des Fensters liegt mit im
+ * Rechteck. Dann bleibt es bei der Umschlagsregel von ``parseAddress``.
  */
 export function parseSeite(text) {
-  const bereinigt = ohneAnkerbeschriftung(text)
+  const zeilen = ohneAnkerbeschriftung(text)
     .split('\n')
-    .map((z) => z.replace(/^abs(?:ender)?\s*[.:]+\s*/i, '').trim())
+    .map((zeile) => zeile.replace(/^abs(?:ender)?\s*[.:]+\s*/i, '').trim())
     .filter(Boolean);
-  const erst = parseAddress(bereinigt.join('\n'));
-  if (erst.postalCode) return erst;
+  const zerlegt = zeilen.map((zeile) => zerlegeEinzeiler(zeile));
+  const eigenerBlock = zeilen.some(
+    (zeile, i) => !zerlegt[i] && matchPostalLine(glaetteZiffern(zeile)),
+  );
+  if (eigenerBlock || !zerlegt.some(Boolean)) return parseAddress(zeilen.join('\n'));
 
-  const index = erst.returnLine
-    ? bereinigt.findIndex((z) => z === erst.returnLine || erst.returnLine.includes(z))
-    : bereinigt.findIndex((z) => zerlegeEinzeiler(z));
-  const teile = index === -1 ? zerlegeEinzeiler(erst.returnLine) : zerlegeEinzeiler(bereinigt[index]);
-  if (!teile) return erst;
-
-  const zeilen = index === -1 ? teile : [...bereinigt.slice(0, index), ...teile, ...bereinigt.slice(index + 1)];
-  const zweit = parseAddress(zeilen.join('\n'));
-  if (!zweit.postalCode) return erst;
-  zweit.notes = ['Die Anschrift stand in einer Zeile und wurde aufgeteilt.', ...zweit.notes];
-  return zweit;
+  // Eine Seite trägt eine Anschrift. Liest die Erkennung eine schief
+  // stehende, unterstrichene Zeile doppelt, zählt die erste Lesung. Die
+  // zweite stammt aus der Unterstreichung und ist die schlechtere.
+  const erste = zerlegt.findIndex(Boolean);
+  const doppelt = zerlegt.filter(Boolean).length - 1;
+  const entfaltet = zeilen.flatMap((zeile, i) => {
+    if (!zerlegt[i]) return [zeile];
+    return i === erste ? zerlegt[i] : [];
+  });
+  const ergebnis = parseAddress(entfaltet.join('\n'));
+  const hinweise = ['Die Anschrift stand in einer Zeile und wurde aufgeteilt.'];
+  if (doppelt) hinweise.push('Die Zeile wurde mehrfach gelesen, es gilt die erste Lesung.');
+  ergebnis.notes = [...hinweise, ...ergebnis.notes];
+  return ergebnis;
 }
 
 /**

@@ -95,6 +95,31 @@ def _envelope_png(path: Path) -> Path:
     return path
 
 
+def _brief_png(path: Path, schraeg: float = -1.0) -> Path:
+    """Erzeugt einen erfundenen Brief mit einzeiliger Absenderangabe.
+
+    Nachgebaut ist, was am echten Brief Schwierigkeiten macht: Die
+    Absenderzeile ist die kleinste Schrift auf dem Umschlag, sie ist
+    unterstrichen, das Papier ist nicht weiß und das Foto steht leicht schief.
+    Die Auflösung entspricht einer angeschlossenen Kamera, fünf Pixel je
+    Millimeter. Die Anschriften sind erfunden.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+
+    image = Image.new("L", (1100, 550), 228)
+    draw = ImageDraw.Draw(image)
+    absender = "Musterverein e.V. · Beispielweg 3 · 99423 Weimar"
+    draw.text((110, 210), absender, font=_schrift(10), fill=75)
+    kasten = draw.textbbox((110, 210), absender, font=_schrift(10))
+    draw.line([110, kasten[3] + 3, kasten[2], kasten[3] + 3], fill=95, width=1)
+    lines = ["Beispielbibliothek Jena", "Erwerbung", "Musterplatz 2", "07743 Jena"]
+    for index, line in enumerate(lines):
+        draw.text((110, 285 + index * 28), line, font=_schrift(20), fill=40)
+    image = image.rotate(schraeg, fillcolor=228).filter(ImageFilter.GaussianBlur(0.6))
+    image.convert("RGB").save(path)
+    return path
+
+
 def _gedreht(quelle: Path, ziel: Path, grad: int = 90) -> Path:
     """Legt ein Prüfbild quer – so, wie eine Sendung auf dem Tisch liegt."""
     from PIL import Image
@@ -504,6 +529,39 @@ class BrowserFlow(unittest.TestCase):
             status = page.text_content("#ocr-status")
             self.assertIn("Empfänger:", status)
             self.assertIn("Absender:", status)
+
+    @unittest.skipUnless(
+        TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
+    )
+    def test_markierte_absenderzeile_am_brief_wird_zur_anschrift(self):
+        """Die kleine, unterstrichene, leicht schiefe Absenderzeile eines Briefs.
+
+        Der ganze Weg am Bild: markieren, gerade stellen, vergrößern, lesen,
+        in Zeilen teilen. Vorher las die Erkennung eine solche Zeile doppelt
+        oder mit falschen Ziffern, und der Absender blieb leer oder falsch.
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            image = _brief_png(Path(folder) / "brief.png")
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.set_input_files("#foto-erkennung", str(image))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+
+            # Nur der Streifen mit der Absenderzeile, mit etwas Luft darum.
+            self._markiere("absender", 0.07, 0.34, 0.52, 0.46)
+            page.click("#zuschnitt-erkennen")
+            page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
+
+            adresse = page.input_value("#absender-adresse")
+            self.assertEqual(len(adresse.splitlines()), 3, adresse)
+            self.assertIn("Beispielweg 3", adresse)
+            self.assertIn("99423 Weimar", adresse)
+            self.assertTrue(page.input_value("#absender-org").startswith("Musterverein"), adresse)
+            # Der Empfänger war nicht markiert und bleibt leer.
+            self.assertEqual(page.input_value("#empfaenger-adresse"), "")
+            self.assertEqual(self.errors, [])
 
     def test_schmaler_streifen_bleibt_ein_streifen(self):
         """Ein quer gedruckter Absender am Rand ist ein schmaler Streifen.

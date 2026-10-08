@@ -511,3 +511,114 @@ test('Eine mehrzeilige Anschrift bleibt, wie sie ist', () => {
   assert.equal(p.address, 'Erika Musterfrau\nBeispielstraße 39\n07749 Jena');
   assert.ok(!p.notes.some((n) => n.includes('in einer Zeile')));
 });
+
+// Anlass: am gedruckten Brief kommt der Mittelpunkt der Absenderzeile selten
+// als Mittelpunkt an. Gemessen an erzeugten Streifen in Briefgröße las die
+// Erkennung ihn als „-“, „:“, „+“, „_“, ans nächste Wort geklebt oder gar
+// nicht, auch gemischt in derselben Zeile. Die Lesungen unten sind in dieser
+// Form aufgetreten, die Angaben sind erfunden.
+test('Verlesene Trennzeichen der Absenderzeile trennen trotzdem', () => {
+  for (const zeile of [
+    'Musterverein e.V. : Beispielweg 3 - 99423 Weimar',
+    'Musterverein e.V. : Beispielweg 3 : 99423 Weimar',
+    'Musterverein e.V. -Beispielweg 3 - 99423 Weimar',
+    'Musterverein e.V. - Beispielweg 3 99423 Weimar',
+    'Musterverein e.V. - Beispielweg 3 + 99423 Weimar',
+    'Musterverein e.V. _ Beispielweg 3 _ 99423 Weimar',
+    'Musterverein e.V.- Beispielweg 3. · 99423 Weimar',
+    'Musterverein e.V. Beispielweg 3 99423 Weimar',
+    "Musterverein e.V. | Beispielweg 3 ' 99423 Weimar",
+  ]) {
+    const p = parseSeite(zeile);
+    assert.equal(p.address, 'Musterverein e.V.\nBeispielweg 3\n99423 Weimar', zeile);
+    assert.equal(p.organisation, 'Musterverein e.V.', zeile);
+    assert.equal(p.street, 'Beispielweg 3', zeile);
+  }
+});
+
+test('Einzeiler: Hausnummernbereich, Postfach, verlesene Postleitzahl, Bindestrichname', () => {
+  assert.deepEqual(zerlegeEinzeiler('Musterverein e.V. - Beispielweg 12 - 14 - D-99423 Weimar'), [
+    'Musterverein e.V.',
+    'Beispielweg 12-14',
+    'D-99423 Weimar',
+  ]);
+  assert.deepEqual(zerlegeEinzeiler('Musterverein e.V. Postfach 10 01 41 07701 Jena'), [
+    'Musterverein e.V.',
+    'Postfach 10 01 41',
+    '07701 Jena',
+  ]);
+  assert.equal(parseSeite('Musterverein e.V. · Beispielweg 3 · O7743 Jena').postalCode, '07743');
+  // „Universitäts- und“ ist ein Wort mit Ergänzungsstrich, keine Trennstelle.
+  assert.deepEqual(
+    zerlegeEinzeiler('Beispiel Universitäts- und Landesbibliothek · Musterplatz 2 · 07743 Jena'),
+    ['Beispiel Universitäts- und Landesbibliothek', 'Musterplatz 2', '07743 Jena'],
+  );
+  // Eine Rechtsform gehört nicht zum Straßennamen.
+  assert.deepEqual(zerlegeEinzeiler('Abs: Musterverlag GmbH Lange Straße 4 99423 Weimar'), [
+    'Musterverlag GmbH',
+    'Lange Straße 4',
+    '99423 Weimar',
+  ]);
+});
+
+test('Gewöhnliche Zeilen sind keine Einzeiler', () => {
+  for (const zeile of ['07743 Jena', 'D-07743 Jena', 'DE 07743 Jena', 'Bibliotheksplatz 2', 'Musterverein e.V.']) {
+    assert.equal(zerlegeEinzeiler(zeile), null, zeile);
+  }
+});
+
+// Anlass: eine schief fotografierte, unterstrichene Absenderzeile las die
+// Erkennung doppelt, die zweite Lesung stammte aus der Unterstreichung.
+test('Doppelt gelesene Absenderzeile ergibt eine Anschrift', () => {
+  const p = parseSeite(
+    'Musterverein e.V. - Beispielweg 3 - 99423 Weimar\nMuSSrverein 6 V.- Beispielweg 3 - 99423 Weimar',
+  );
+  assert.equal(p.address, 'Musterverein e.V.\nBeispielweg 3\n99423 Weimar');
+  assert.ok(p.notes.some((n) => n.includes('mehrfach gelesen')));
+});
+
+test('Name oben, Straße und Ort in einer Zeile darunter', () => {
+  const p = parseSeite('Musterverein e.V.\nBeispielweg 3, 99423 Weimar');
+  assert.equal(p.address, 'Musterverein e.V.\nBeispielweg 3\n99423 Weimar');
+});
+
+// Großzügig markiert: die Rücksendezeile des Fensters liegt mit im Rechteck
+// des Empfängers. Sie darf nicht in dessen Anschrift geraten.
+test('Rücksendezeile im markierten Empfängerbereich bleibt außen vor', () => {
+  const p = parseSeite(
+    'Musterverein e.V. : Hauptweg 7 : 99423 Weimar\nErika Musterfrau\nBeispielstraße 39\n07749 Jena',
+  );
+  assert.equal(p.address, 'Erika Musterfrau\nBeispielstraße 39\n07749 Jena');
+  assert.match(p.returnLine, /Musterverein/);
+});
+
+// Anlass: beim ganzen Umschlag galt als Rücksendezeile nur, was einen
+// Mittelpunkt oder Gedankenstrich enthielt. War der Mittelpunkt verlesen,
+// blieb der Absender im Block des Empfängers stehen.
+test('Ganzer Umschlag: verlesene Rücksendezeile wird trotzdem zum Absender', () => {
+  const ergebnis = parseLabel(
+    [
+      'Musterverlag GmbH : Hauptstr. 4 : 10115 Berlin',
+      'Beispiel-Universitaet Jena',
+      'Beispielbibliothek',
+      'Musterplatz 2',
+      '07743 Jena',
+    ].join('\n'),
+  );
+  assert.equal(ergebnis.absender.address, 'Musterverlag GmbH\nHauptstr. 4\n10115 Berlin');
+  assert.equal(ergebnis.empfaenger.postalCode, '07743');
+  assert.ok(!ergebnis.empfaenger.address.includes('10115'));
+});
+
+test('Straße und Ort in einer Zeile machen den Empfänger nicht zum Absender', () => {
+  const p = parseAddress('Erika Musterfrau\nBeispielweg 3, 07743 Jena');
+  assert.equal(p.returnLine, '');
+});
+
+test('Etikett: einzeiliger Absender hinter der Beschriftung', () => {
+  const ergebnis = parseLabel(
+    'Empfänger:\nErika Musterfrau\nBeispielweg 3\n07743 Jena\nAbsender: Musterverein e.V. · Hauptweg 7 · 99423 Weimar',
+  );
+  assert.equal(ergebnis.absender.address, 'Musterverein e.V.\nHauptweg 7\n99423 Weimar');
+  assert.equal(ergebnis.empfaenger.address, 'Erika Musterfrau\nBeispielweg 3\n07743 Jena');
+});

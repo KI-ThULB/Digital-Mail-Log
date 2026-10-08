@@ -47,7 +47,8 @@ Die Browsertests brauchen `pip install playwright pillow` und Chromium. Nach
   (GeoNames, CC BY 4.0, erzeugt mit `werkzeuge/plz-tabelle.py`).
 - `web/js/app.js` – Oberfläche: Markieren, Erkennung mit Drehungssuche,
   Kamera, „Text einfügen“, Übernahme- und Prüfhinweise.
-- `web/js/ocr.js` – Bildvorbereitung und Tesseract.
+- `web/js/ocr.js` – Bildvorbereitung und Tesseract. Markierte Bereiche werden
+  gerade gestellt und bei kleiner Schrift vergrößert (`bereiteBereichAuf`).
 - `docs/ENTSCHEIDUNGEN.md` – Entscheidungen E01 ff. mit Anlass und
   Rücknahmebedingung. Neue Grundsatzentscheidungen dort als nächste Nummer.
 - `docs/TESTSTATUS.md` – Testzahlen je Prüfstrecke und die nummerierte Liste
@@ -76,5 +77,7 @@ Die Browsertests brauchen `pip install playwright pillow` und Chromium. Nach
 - Handreichung: Ansprechpartner und Erreichbarkeit fehlen noch.
 - Angeboten, nicht entschieden: Spalten „Markieren gelungen?“ und „Stimmte die
   Rückmeldung der App?“ im Erhebungsbogen.
-- Einzeilige Absenderangabe auf Briefen (9ac2f07) ist am echten Brief noch
-  nicht bestätigt.
+- Einzeilige Absenderangabe auf Briefen: an erzeugten Briefen nachgestellt und
+  behoben (Befund 21 in `docs/TESTSTATUS.md`), am echten Brief noch nicht
+  bestätigt. Dazu Absenderzeile markieren und den Rohtext unter „Erkannter
+  Text“ ansehen.

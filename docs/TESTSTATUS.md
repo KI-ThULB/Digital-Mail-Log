@@ -10,9 +10,9 @@ Stand 08.10.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 54 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 19 | bestanden |
-| **Summe** | **161** | **bestanden** |
+| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 63 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 20 | bestanden |
+| **Summe** | **171** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -112,6 +112,13 @@ Erkennung folgenlos ins Leere.
 Umschlagrand („Verein e.V. | Straße 4 | 01067 DRE .“) wird zerlegt, der
 Buchstabensalat ringsum verworfen und ein alleinstehender Punkt am Zeilenende
 als Papierrand erkannt.
+
+**Absenderzeile am Brief.** An einem erzeugten Brief in der Auflösung einer
+angeschlossenen Kamera wird die kleine, unterstrichene, leicht schief stehende
+Absenderzeile markiert und im Browser gelesen. Der markierte Bereich wird
+gerade gestellt und vergrößert, die Zeile an der Postleitzahl, an verlesenen
+Trennzeichen und notfalls an der Hausnummer geteilt. Am echten Brief ist das
+noch zu bestätigen.
 
 **Schmale Streifen.** Ein bewusst schmal gezogener Rahmen — die Form eines quer
 gedruckten Absenders am Rand — bleibt schmal; ein Antippen setzt weiterhin einen
@@ -299,3 +306,27 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     Windows und gibt der Ersatzschrift die verlangte Größe mit. Am Code der
     App hat sich nichts geändert. Erkannt beim vollständigen Testlauf auf dem
     Entwicklungsrechner.
+21. **Die einzeilige Absenderangabe am Brief trug nicht verlässlich.** Die
+    Behebung aus Befund 19 war nur über eingefügten Text geprüft. Nachgestellt
+    an erzeugten Briefen mit markierter Absenderzeile zeigten sich drei
+    Ursachen. Erstens die Schriftgröße: bei sieben bis elf Pixeln las die
+    Erkennung Ziffern falsch („98423“ statt „99423“) oder nichts. Zweitens die
+    Schräglage: schon bei anderthalb Grad wurde die unterstrichene Zeile
+    doppelt gelesen. Drittens die Trennzeichen: der Mittelpunkt kam als „-“,
+    „:“, „+“, „_“, an das nächste Wort geklebt oder gar nicht an, auch gemischt
+    in einer Zeile, und die der Reihe nach probierte Trennerliste griff dann
+    nicht. Behoben an beiden Enden. Ein markierter Bereich wird vor dem Lesen
+    gerade gestellt und bei kleiner Schrift auf rund dreißig Pixel Zeilenhöhe
+    vergrößert. Bleibt der Text danach leer, wird der Bereich unverändert
+    gelesen. Die Zerlegung richtet sich nach dem Aufbau statt nach einer
+    Trennerliste: erst an der Postleitzahl, dann an allem, was als
+    Trennzeichen dasteht, und wo keines stand, an der Hausnummer. Sie steht
+    an einer Stelle und gilt für den markierten Bereich, den eingefügten
+    Text, die Rücksendezeile des ganzen Umschlags und den Block hinter
+    „Absender“ auf einem Etikett. Eine doppelt gelesene Zeile ergibt eine
+    Anschrift. Liegt die Rücksendezeile mit im markierten Empfängerbereich,
+    bleibt sie außen vor. Gemessen an 36 erzeugten Briefen (770 bis 2640
+    Pixel Breite, bis zwei Grad schief) stieg die Zahl der fehlerfrei
+    zerlegten Absender von 20 auf 30. Die übrigen sechs liegen bei sieben bis
+    elf Pixeln Schrifthöhe und enthalten einzelne verlesene Zeichen. Am
+    echten Brief noch nicht bestätigt.

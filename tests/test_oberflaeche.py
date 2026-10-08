@@ -120,6 +120,33 @@ def _brief_png(path: Path, schraeg: float = -1.0) -> Path:
     return path
 
 
+def _etikett_im_kasten_png(path: Path) -> Path:
+    """Erzeugt ein erfundenes Paketetikett, dessen Empfänger in einem Kasten steht.
+
+    Nachgebaut ist das echte Etikett, an dem Postleitzahl und Ort des
+    Empfängers verloren gingen: weißes Etikett auf braunem Karton, die
+    Anschrift mit großen Zeilenabständen, die Zeile mit Postleitzahl und Ort
+    unmittelbar über der unteren Kastenlinie, rechts eine senkrechte Linie.
+    Die Anschriften sind erfunden.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+
+    image = Image.new("RGB", (1400, 1000), "#a98a66")
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle([150, 60, 1320, 960], radius=18, fill="#eef1ef")
+    draw.text((205, 150), "Empfaenger", font=_schrift(13), fill="#333333")
+    for y, text in ((178, "Erika Musterfrau"), (300, "Beispielstr. 39"), (470, "DE-99423 Weimar")):
+        draw.text((205, y), text, font=_schrift(30), fill="#111111")
+    draw.line([205, 508, 1300, 508], fill="#111111", width=3)
+    draw.line([930, 140, 930, 508], fill="#111111", width=3)
+    draw.text((205, 520), "Referenz 1", font=_schrift(13), fill="#333333")
+    draw.text((205, 545), "4711", font=_schrift(18), fill="#111111")
+    draw.text((960, 160), "Musterfracht Depot", font=_schrift(16), fill="#111111")
+    image = image.rotate(0.4, fillcolor="#a98a66").filter(ImageFilter.GaussianBlur(0.5))
+    image.save(path)
+    return path
+
+
 def _gedreht(quelle: Path, ziel: Path, grad: int = 90) -> Path:
     """Legt ein Prüfbild quer – so, wie eine Sendung auf dem Tisch liegt."""
     from PIL import Image
@@ -561,6 +588,37 @@ class BrowserFlow(unittest.TestCase):
             self.assertTrue(page.input_value("#absender-org").startswith("Musterverein"), adresse)
             # Der Empfänger war nicht markiert und bleibt leer.
             self.assertEqual(page.input_value("#empfaenger-adresse"), "")
+            self.assertEqual(self.errors, [])
+
+    @unittest.skipUnless(
+        TESSERACT.exists(), "Texterkennung nicht eingerichtet (web/vendor/hole-tesseract.sh)."
+    )
+    def test_kastenlinien_im_markierten_bereich_stoeren_nicht(self):
+        """Großzügig markiert: Kastenlinien und Etikettenrand liegen mit im Rechteck.
+
+        Anlass war ein echtes Paketetikett. Der Empfänger wurde wiederholt ohne
+        Postleitzahl und Ort erfasst, weil die Zeile direkt über der unteren
+        Kastenlinie stand und mit den Linien im Bild unlesbar wurde.
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            image = _etikett_im_kasten_png(Path(folder) / "etikett.png")
+            page = self.page
+            page.goto(self.base)
+            page.wait_for_selector("#kennung:not(:empty)")
+            page.click("#neu")
+            page.set_input_files("#foto-erkennung", str(image))
+            page.wait_for_selector("#zuschnitt:not([hidden])")
+
+            # Über den Kasten hinaus: links der Etikettenrand, rechts die
+            # senkrechte, unten die waagerechte Linie.
+            self._markiere("empfaenger", 0.09, 0.13, 0.68, 0.53)
+            page.click("#zuschnitt-erkennen")
+            page.wait_for_selector("#ocr-ergebnis:not([hidden])", timeout=180_000)
+
+            adresse = page.input_value("#empfaenger-adresse")
+            self.assertIn("Erika Musterfrau", adresse)
+            self.assertIn("Beispielstr. 39", adresse)
+            self.assertIn("99423 Weimar", adresse)
             self.assertEqual(self.errors, [])
 
     def test_schmaler_streifen_bleibt_ein_streifen(self):

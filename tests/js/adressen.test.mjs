@@ -622,3 +622,15 @@ test('Etikett: einzeiliger Absender hinter der Beschriftung', () => {
   assert.equal(ergebnis.absender.address, 'Musterverein e.V.\nHauptweg 7\n99423 Weimar');
   assert.equal(ergebnis.empfaenger.address, 'Erika Musterfrau\nBeispielweg 3\n07743 Jena');
 });
+
+// Anlass: „DE-07749“ mit durchgestrichener Null wurde als „807749“ gelesen.
+// Die Zeile muss eine Postleitzahlzeile bleiben, sonst kann die Prüfung die
+// richtige Zahl nicht anbieten. Angaben erfunden.
+test('Sechs Ziffern vor dem Ort bleiben eine Postleitzahlzeile', () => {
+  const p = parseAddress('Erika Musterfrau\nBeispielstraße 39\n899423 Weimar');
+  assert.equal(p.postalCode, '899423');
+  assert.equal(p.city, 'Weimar');
+  assert.equal(p.street, 'Beispielstraße 39');
+  // Eine bloße sechsstellige Zahl ist keine.
+  assert.equal(matchPostalLine('683304'), null);
+});

@@ -10,9 +10,9 @@ Stand 08.10.2026.
 | Speicherung (`tests/test_storage.py`) | 21 | bestanden |
 | Schnittstelle (`tests/test_api.py`) | 23 | bestanden |
 | Entwicklungsserver (`tests/test_server.py`) | 6 | bestanden |
-| Adressparser, Postleitzahlprüfung, Portokorpus (`tests/js/`) | 63 | bestanden |
-| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 20 | bestanden |
-| **Summe** | **171** | **bestanden** |
+| Adressparser, Postleitzahlprüfung, Portokorpus, Bildvorbereitung (`tests/js/`) | 71 | bestanden |
+| Oberfläche im Browser (`tests/test_oberflaeche.py`) | 21 | bestanden |
+| **Summe** | **180** | **bestanden** |
 
 Umgebung des Laufs: Linux, Python 3.11.15, Node 22.22.2, Chromium über
 Playwright. Die Bauumgebung prüft zusätzlich Python 3.13 und Node 20.
@@ -330,3 +330,33 @@ gelten die Punkte in `docs/BETRIEB.md`, Abschnitt 8.
     zerlegten Absender von 20 auf 30. Die übrigen sechs liegen bei sieben bis
     elf Pixeln Schrifthöhe und enthalten einzelne verlesene Zeichen. Am
     echten Brief noch nicht bestätigt.
+22. **Am Paketetikett fehlten Postleitzahl und Ort des Empfängers erneut.**
+    Die Erklärung aus Befund 18 traf für dieses Etikett nicht zu. Am echten
+    Foto zeigte sich: Postleitzahl und Ort stehen im selben Kasten wie Name
+    und Straße, nur mit großem Zeilenabstand, und unmittelbar über der
+    unteren Kastenlinie. Lagen beim großzügigen Markieren die untere Linie,
+    die senkrechte Linie rechts und der Etikettenrand links mit im Rechteck,
+    las die Erkennung genau diese Zeile als Buchstabensalat, und der Parser
+    verwarf sie als unlesbar. Fehlte eine der drei Kanten, wurde die Zeile
+    gelesen. Beim Absender liegt keine Linie unter der Zeile, deshalb kam er
+    vollständig an. Behoben in der Bildvorbereitung: im gerade gestellten
+    Bereich werden Linien übermalt, also durchgehend dunkle Läufe, die
+    länger sind, als ein Schriftzeichen breit oder hoch sein kann. Das nimmt
+    auch die Unterstreichung einer Absenderzeile heraus. **Nur am echten
+    Foto sichtbar geworden**: ein erzeugtes Etikett mit denselben Linien las
+    die Erkennung auch vorher richtig, der Browsertest dazu sichert deshalb
+    nur ab, dass die Bereinigung nichts verschlechtert. Die Rechenschritte
+    selbst sind an erzeugten Flächen geprüft. Am Foto durchgespielt mit
+    verschieden großen Markierungen, in allen stehen Postleitzahl und Ort.
+    Ein eigener Markierbereich nur für Postleitzahl und Ort war zwischendurch
+    gebaut und ist wieder entfernt, weil er auf der Annahme aus Befund 18
+    beruhte und die Bedienung ohne Anlass erweitert hätte.
+23. **Die durchgestrichene Null des Etiketts wird als Acht gelesen.** Aus
+    „DE-07749“ wurde je nach Ausschnitt „07749“, „87749“ oder „807749“. Das
+    Lesen selbst ließ sich nicht verbessern. Die Prüfung gegen die
+    Postleitzahltabelle fängt es auf: Sechs Ziffern vor einem Ort bleiben
+    eine Postleitzahlzeile, und die Prüfung sucht die Zahl, die ohne eine der
+    Ziffern zum Ort passt. Steht hinter dem richtigen Ort ein Rest aus ein,
+    zwei Zeichen („Jena AM“, eine Spur der Kastenlinie), findet sie die Zahl
+    trotzdem und bietet danach den Ort ohne den Rest an. Wie immer wird
+    angeboten und nicht eingesetzt.

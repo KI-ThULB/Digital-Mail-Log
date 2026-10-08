@@ -1427,7 +1427,7 @@ function pruefeSeite(seite, { nachErkennung = false } = {}) {
   }
 
   const urteil = pruefeAnschrift(zerlegt);
-  const { status, vorschlag, kandidaten } = urteil;
+  const { status, vorschlag, kandidaten, zuLang } = urteil;
 
   if (status === 'unbekannt' || status === 'stimmt') {
     bereich.hidden = true;
@@ -1463,9 +1463,14 @@ function pruefeSeite(seite, { nachErkennung = false } = {}) {
     widerspruch:
       `Erkannt: „${zerlegt.city}“, zur Postleitzahl ${zerlegt.postalCode} gehört aber ${vorschlag}. ` +
       'Bitte am Umschlag prüfen – es kann auch die Postleitzahl falsch gelesen sein.',
-    'plz-vertippt':
-      `Die Postleitzahl ${zerlegt.postalCode} passt nicht zu „${zerlegt.city}“, ` +
-      `${vorschlag} dagegen schon – eine Ziffer Unterschied. Vermutlich wurde die Zahl verlesen.`,
+    ueberhang:
+      `Erkannt: „${zerlegt.city}“. Zur Postleitzahl ${zerlegt.postalCode} gehört ${vorschlag}, ` +
+      'der Rest stammt vermutlich vom Rand des markierten Bereichs.',
+    'plz-vertippt': zuLang
+      ? `„${zerlegt.postalCode}“ hat eine Ziffer zu viel. Zu „${zerlegt.city}“ passt ${vorschlag}. ` +
+        'Vermutlich wurde die Zahl verlesen.'
+      : `Die Postleitzahl ${zerlegt.postalCode} passt nicht zu „${zerlegt.city}“, ` +
+        `${vorschlag} dagegen schon – eine Ziffer Unterschied. Vermutlich wurde die Zahl verlesen.`,
   }[status];
 
   bereich.replaceChildren(

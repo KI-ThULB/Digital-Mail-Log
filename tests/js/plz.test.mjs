@@ -99,3 +99,24 @@ test('Die Postleitzahl wird ersetzt, der Ort bleibt stehen', () => {
     ['Herrn Max Muster', 'Luise-Seidler-Straße 39', '07749 Jena'].join('\n'),
   );
 });
+
+// Anlass: am echten Paketetikett stand hinter dem richtigen Ort ein Rest aus
+// ein, zwei Buchstaben – eine Spur der Kastenlinie am Rand des Bereichs.
+test('Kurzer Rest hinter dem Ort wird als Überhang angeboten', () => {
+  assert.deepEqual(beurteileOrt(['Weimar'], 'Weimar AM'), { status: 'ueberhang', vorschlag: 'Weimar' });
+  assert.deepEqual(beurteileOrt(['Weimar'], 'Weimar A'), { status: 'ueberhang', vorschlag: 'Weimar' });
+  // Ein Ortsteil ist kein Rest.
+  assert.equal(beurteileOrt(['Weimar'], 'Weimar Nord').status, 'stimmt');
+});
+
+// Anlass: die durchgestrichene Null eines Etiketts wurde als „80“ gelesen,
+// aus fünf Ziffern wurden sechs.
+test('Eine Ziffer zu viel: die passende Postleitzahl wird gefunden', () => {
+  const suche = (plz) => ({ 99423: ['Weimar'], 89423: ['Gundelfingen'] })[plz] || null;
+  assert.deepEqual(ziffernKandidaten('899423', 'Weimar', suche), ['99423']);
+  // Auch mit einem Rest hinter dem Ort.
+  assert.deepEqual(ziffernKandidaten('899423', 'Weimar AM', suche), ['99423']);
+  assert.deepEqual(ziffernKandidaten('89423', 'Weimar A', suche), ['99423']);
+  assert.deepEqual(ziffernKandidaten('899423', 'Erfurt', suche), []);
+  assert.equal(ersetzePostleitzahl('Erika Muster\nBeispielweg 3\n899423 Weimar', '99423'), 'Erika Muster\nBeispielweg 3\n99423 Weimar');
+});

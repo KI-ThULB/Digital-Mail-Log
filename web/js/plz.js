@@ -76,12 +76,15 @@ function falte(text) {
  *
  * Reine Funktion, damit sie ohne Netz und ohne Browser prüfbar ist.
  *
- * @returns {{status:'unbekannt'|'stimmt'|'ergaenzen'|'abkuerzung'|'widerspruch',
+ * @returns {{status:'unbekannt'|'stimmt'|'ergaenzen'|'abkuerzung'|'ueberhang'|'widerspruch',
  *            vorschlag:string}}
  *
  * * ``ergaenzen``  – es wurde kein Ort gelesen, die Postleitzahl kennt einen.
  * * ``abkuerzung`` – das Gelesene ist ein Anfang des Namens („WE“ → „Weimar“).
  *   Das ist der häufige Fall eines abgeschnittenen Ausschnitts.
+ * * ``ueberhang`` – hinter dem richtigen Ort stehen ein, zwei kurze Reste
+ *   („Jena AM“). Am echten Paketetikett waren das Spuren der Kastenlinie am
+ *   Rand des markierten Bereichs. Angeboten wird der Ort ohne den Rest.
  * * ``widerspruch`` – beides ist lesbar und passt nicht zueinander. Dann wird
  *   **gesagt**, was nicht zusammenpasst, und nichts stillschweigend geändert:
  *   es kann ebenso gut die Postleitzahl falsch gelesen sein.
@@ -97,6 +100,14 @@ export function beurteileOrt(namen, gelesen) {
   if (verglichen.some((e) => e.vergleich === gesucht)) {
     return { status: 'stimmt', vorschlag: '' };
   }
+  // Der Tabellenname, gefolgt von höchstens zwei Resten aus ein, zwei Zeichen:
+  // das ist kein Ortsteil, sondern Rand. „Weimar Nord“ fällt nicht darunter.
+  const mitRest = verglichen.find((e) => {
+    if (!gesucht.startsWith(`${e.vergleich} `)) return false;
+    const rest = gesucht.slice(e.vergleich.length).trim().split(' ');
+    return rest.length <= 2 && rest.every((teil) => teil.length <= 2);
+  });
+  if (mitRest) return { status: 'ueberhang', vorschlag: mitRest.name };
   // Ein längerer gelesener Ort, der mit dem Tabellennamen beginnt, gilt als
   // richtig: „Weimar Nord“ ist kein Widerspruch zu „Weimar“.
   if (verglichen.some((e) => gesucht.startsWith(`${e.vergleich} `) || gesucht.startsWith(e.vergleich))) {
@@ -121,21 +132,36 @@ export function beurteileOrt(namen, gelesen) {
  * 3/8, 5/6). Passt genau eine Abwandlung zum gelesenen Ort, ist das ein starker
  * Hinweis – und zwar auf die Zahl, nicht auf den Ort.
  *
+ * Sechs Ziffern statt fünf sind derselbe Fehler in anderer Gestalt. Am echten
+ * Paketetikett war die Null durchgestrichen gedruckt, und die Erkennung las
+ * sie einmal als Acht („87749“) und einmal als Acht und Null („807749“).
+ * Dann wird geprüft, welche Zahl ohne eine der sechs Ziffern zum Ort passt.
+ *
  * @param suche Funktion Postleitzahl → Ortsnamen. Als Parameter, damit sich die
  *        Regel ohne geladene Tabelle prüfen lässt.
  */
 export function ziffernKandidaten(plz, ort, suche) {
   const gesucht = falte(ort || '');
-  if (!/^\d{5}$/.test(plz || '') || !gesucht) return [];
-  const treffer = [];
-  for (let stelle = 0; stelle < 5; stelle += 1) {
-    for (let ziffer = 0; ziffer <= 9; ziffer += 1) {
-      const kandidat = `${plz.slice(0, stelle)}${ziffer}${plz.slice(stelle + 1)}`;
-      if (kandidat === plz || treffer.includes(kandidat)) continue;
-      const namen = suche(kandidat) || [];
-      if (namen.some((name) => falte(name) === gesucht || falte(name).startsWith(gesucht))) {
-        treffer.push(kandidat);
+  if (!/^\d{5,6}$/.test(plz || '') || !gesucht) return [];
+  const abwandlungen = [];
+  if (plz.length === 6) {
+    for (let stelle = 0; stelle < 6; stelle += 1) {
+      abwandlungen.push(`${plz.slice(0, stelle)}${plz.slice(stelle + 1)}`);
+    }
+  } else {
+    for (let stelle = 0; stelle < 5; stelle += 1) {
+      for (let ziffer = 0; ziffer <= 9; ziffer += 1) {
+        abwandlungen.push(`${plz.slice(0, stelle)}${ziffer}${plz.slice(stelle + 1)}`);
       }
+    }
+  }
+  const treffer = [];
+  for (const kandidat of abwandlungen) {
+    if (kandidat === plz || treffer.includes(kandidat)) continue;
+    const namen = (suche(kandidat) || []).map(falte);
+    // Der gelesene Ort darf abgekürzt sein oder einen kurzen Rest tragen.
+    if (namen.some((name) => name === gesucht || name.startsWith(gesucht) || gesucht.startsWith(`${name} `))) {
+      treffer.push(kandidat);
     }
   }
   return treffer;
@@ -156,7 +182,13 @@ export function pruefeAnschrift({ postalCode, city } = {}) {
 
   const kandidaten = ziffernKandidaten(postalCode, city, orteZu);
   if (kandidaten.length === 1) {
-    return { status: 'plz-vertippt', vorschlag: kandidaten[0], ort: city, kandidaten };
+    return {
+      status: 'plz-vertippt',
+      vorschlag: kandidaten[0],
+      ort: city,
+      kandidaten,
+      zuLang: String(postalCode).length > 5,
+    };
   }
   if (kandidaten.length > 1) {
     return { status: 'plz-mehrdeutig', vorschlag: '', ort: city, kandidaten };

@@ -86,8 +86,8 @@ export function dreheBild(bild, grad) {
  *   doppelt, weil sie die Unterstreichung für eine zweite Zeile hielt, oder
  *   sie lieferte nach dem Vergrößern nichts mehr.
  *
- * Deshalb wird ein markierter Bereich erst gerade gestellt und dann, wenn
- * die Schrift klein ist, vergrößert. Beides gilt nur für markierte Bereiche:
+ * Deshalb wird ein markierter Bereich erst gerade gestellt, von Linien befreit
+ * und dann, wenn die Schrift klein ist, vergrößert. Beides gilt nur für markierte Bereiche:
  * Im ganzen Bild stehen Schriften aller Größen und Richtungen nebeneinander,
  * und eine Messung über alles sagt dort wenig.
  * ------------------------------------------------------------------ */
@@ -240,12 +240,80 @@ function richteAus(flaeche, schraeglage, faktor, papier) {
 }
 
 /**
- * Stellt einen markierten Bereich gerade und vergrößert kleine Schrift.
- * Gibt die Fläche unverändert zurück, wenn nichts zu tun ist.
+ * Übermalt Linien in einem entsättigten, gerade stehenden Bild mit Papier.
+ *
+ * Anlass war ein echtes Paketetikett: Die Anschrift des Empfängers steht dort
+ * in einem Kasten. Lag beim großzügigen Markieren die untere und die rechte
+ * Kastenlinie mit im Rechteck, las die Erkennung die Zeile direkt über der
+ * Linie, Postleitzahl und Ort, als Buchstabensalat. Ohne die Linien las sie
+ * dieselbe Zeile richtig. Dasselbe gilt für die Unterstreichung einer
+ * Absenderzeile.
+ *
+ * Als Linie gilt ein durchgehend dunkler Lauf, der länger ist, als ein
+ * Schriftzeichen breit oder hoch sein kann: waagerecht ein Fünftel der Breite
+ * und mehr als die halbe Höhe, senkrecht vier Fünftel der Höhe.
+ *
+ * @returns {number} Anzahl der übermalten Läufe.
+ */
+export function entferneLinien(pixels, breite, hoehe, schrift) {
+  const dunkel = (x, y) => pixels[(y * breite + x) * 4] < schrift.schwelle;
+  const male = (x, y) => {
+    if (x < 0 || y < 0 || x >= breite || y >= hoehe) return;
+    const i = (y * breite + x) * 4;
+    pixels[i] = schrift.papier;
+    pixels[i + 1] = schrift.papier;
+    pixels[i + 2] = schrift.papier;
+  };
+  // Erst suchen, dann malen: sonst zerschnitte die erste gefundene Linie die
+  // Läufe der kreuzenden.
+  const funde = [];
+  const waagerecht = Math.max(40, breite * 0.2, hoehe * 0.6);
+  if (waagerecht <= breite) {
+    for (let y = 0; y < hoehe; y += 1) {
+      let beginn = -1;
+      for (let x = 0; x <= breite; x += 1) {
+        const an = x < breite && dunkel(x, y);
+        if (an && beginn === -1) beginn = x;
+        if (!an && beginn !== -1) {
+          if (x - beginn >= waagerecht) funde.push({ quer: true, fest: y, von: beginn, bis: x });
+          beginn = -1;
+        }
+      }
+    }
+  }
+  const senkrecht = Math.max(40, hoehe * 0.8);
+  if (senkrecht <= hoehe) {
+    for (let x = 0; x < breite; x += 1) {
+      let beginn = -1;
+      for (let y = 0; y <= hoehe; y += 1) {
+        const an = y < hoehe && dunkel(x, y);
+        if (an && beginn === -1) beginn = y;
+        if (!an && beginn !== -1) {
+          if (y - beginn >= senkrecht) funde.push({ quer: false, fest: x, von: beginn, bis: y });
+          beginn = -1;
+        }
+      }
+    }
+  }
+  // Mit einem Punkt Saum, denn der Rand einer Linie ist heller als ihr Kern.
+  for (const { quer, fest, von, bis } of funde) {
+    for (let lauf = von - 1; lauf <= bis; lauf += 1) {
+      for (let saum = -1; saum <= 1; saum += 1) {
+        if (quer) male(lauf, fest + saum);
+        else male(fest + saum, lauf);
+      }
+    }
+  }
+  return funde.length;
+}
+
+/**
+ * Stellt einen markierten Bereich gerade, nimmt Linien heraus und vergrößert
+ * kleine Schrift. Gibt die Fläche unverändert zurück, wenn nichts zu tun ist.
  */
 function bereiteBereichAuf(flaeche, maxEdge) {
-  const lies = (c) => c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data;
-  const pixels = lies(flaeche);
+  const lies = (c) => c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height);
+  const pixels = lies(flaeche).data;
   const schrift = trenneSchrift(pixels);
   if (!schrift) return flaeche;
 
@@ -253,12 +321,16 @@ function bereiteBereichAuf(flaeche, maxEdge) {
   // hochkant, findet sich keine Schräglage und nur ein einziger hoher Lauf,
   // und es geschieht nichts.
   const schraeglage = schaetzeSchraeglage(pixels, flaeche.width, flaeche.height);
-  const gerade = schraeglage ? richteAus(flaeche, schraeglage, 1, schrift.papier) : flaeche;
-  const zeilenhoehe = schaetzeZeilenhoehe(
-    schraeglage ? lies(gerade) : pixels,
-    gerade.width,
-    gerade.height,
-  );
+  // Stets auf einer eigenen Fläche weiter, damit die Ausgangsfläche für den
+  // Rückfall ohne Aufbereitung unberührt bleibt.
+  const gerade = richteAus(flaeche, schraeglage, 1, schrift.papier);
+  const bild = lies(gerade);
+  // Erst gerade stellen, dann Linien suchen: auf einer schiefen Fläche
+  // zerfällt eine Linie in viele kurze Läufe.
+  if (entferneLinien(bild.data, gerade.width, gerade.height, schrift)) {
+    gerade.getContext('2d').putImageData(bild, 0, 0);
+  }
+  const zeilenhoehe = schaetzeZeilenhoehe(bild.data, gerade.width, gerade.height);
 
   let faktor = 1;
   if (zeilenhoehe > 0 && zeilenhoehe < KLEINE_SCHRIFT) {
@@ -268,9 +340,7 @@ function bereiteBereichAuf(flaeche, maxEdge) {
       (maxEdge * 1.5) / Math.max(flaeche.width, flaeche.height),
     );
   }
-  if (faktor < 1.2) return gerade;
-  // In einem Zug aus der Ausgangsfläche, damit nicht zweimal gerechnet wird.
-  return richteAus(flaeche, schraeglage, faktor, schrift.papier);
+  return faktor < 1.2 ? gerade : richteAus(gerade, 0, faktor, schrift.papier);
 }
 
 /**

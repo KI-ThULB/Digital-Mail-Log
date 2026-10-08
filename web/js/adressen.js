@@ -229,6 +229,11 @@ export function matchPostalLine(line) {
   }
   const austrian = line.match(/^(\d{4})\s+([A-ZÄÖÜ][^\d]{2,})$/);
   if (austrian) return { postalCode: austrian[1], city: austrian[2].trim(), country: '' };
+  // Sechs Ziffern vor einem Ort sind eine verlesene Postleitzahl: am echten
+  // Etikett wurde die durchgestrichene Null als „80“ gelesen. Die Zeile bleibt
+  // eine Postleitzahlzeile, damit die Prüfung die richtige Zahl anbieten kann.
+  const zuLang = line.match(/^(\d{6})[\s-]+([A-ZÄÖÜ][A-Za-zÄÖÜäöüß].*)$/);
+  if (zuLang) return { postalCode: zuLang[1], city: zuLang[2].trim(), country: '' };
   return null;
 }
 

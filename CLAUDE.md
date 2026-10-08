@@ -48,7 +48,8 @@ Die Browsertests brauchen `pip install playwright pillow` und Chromium. Nach
 - `web/js/app.js` – Oberfläche: Markieren, Erkennung mit Drehungssuche,
   Kamera, „Text einfügen“, Übernahme- und Prüfhinweise.
 - `web/js/ocr.js` – Bildvorbereitung und Tesseract. Markierte Bereiche werden
-  gerade gestellt und bei kleiner Schrift vergrößert (`bereiteBereichAuf`).
+  gerade gestellt, von Linien befreit und bei kleiner Schrift vergrößert
+  (`bereiteBereichAuf`).
 - `docs/ENTSCHEIDUNGEN.md` – Entscheidungen E01 ff. mit Anlass und
   Rücknahmebedingung. Neue Grundsatzentscheidungen dort als nächste Nummer.
 - `docs/TESTSTATUS.md` – Testzahlen je Prüfstrecke und die nummerierte Liste
@@ -81,3 +82,6 @@ Die Browsertests brauchen `pip install playwright pillow` und Chromium. Nach
   behoben (Befund 21 in `docs/TESTSTATUS.md`), am echten Brief noch nicht
   bestätigt. Dazu Absenderzeile markieren und den Rohtext unter „Erkannter
   Text“ ansehen.
+- Paketetikett: Kastenlinien im markierten Bereich werden übermalt (Befund 22,
+  am echten Foto durchgespielt). Die Bestätigung durch André in der App steht
+  noch aus.
